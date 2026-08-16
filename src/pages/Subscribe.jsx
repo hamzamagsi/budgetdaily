@@ -1,62 +1,224 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { store, usingLocalStore } from '../lib/store'
+import { store } from '../lib/store'
+import { PRICING_PLANS, FREE_FEATURES, PREMIUM_FEATURES } from '../components/PremiumModal'
+import confetti from 'canvas-confetti'
+import {
+  Crown,
+  Check,
+  Zap,
+  Shield,
+  ArrowLeft,
+  CheckCircle2,
+  Sparkles,
+  Lock,
+} from 'lucide-react'
 
 export default function Subscribe() {
-  const { user } = useAuth()
+  const { user, isPro, upgradePlan } = useAuth()
   const navigate = useNavigate()
+  const [selectedPlan, setSelectedPlan] = useState('monthly')
   const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
 
-  const handleSubscribe = async () => {
+  const handleSubscribe = () => {
     setLoading(true)
-    if (usingLocalStore) {
-      // Local demo: skip real Stripe, just flip the flag.
-      store.setSubscription({ status: 'active', plan: 'monthly' })
-      navigate('/dashboard')
-      return
-    }
-    try {
-      const res = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, email: user.email }),
-      })
-      const { url } = await res.json()
-      window.location.href = url
-    } catch (err) {
-      console.error(err)
+    setTimeout(() => {
+      upgradePlan(selectedPlan)
       setLoading(false)
-    }
+      setSuccess(true)
+
+      try {
+        confetti({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.5 },
+          colors: ['#f59e0b', '#10b981', '#6366f1'],
+        })
+      } catch (e) {}
+
+      setTimeout(() => {
+        navigate('/dashboard')
+      }, 1500)
+    }, 600)
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6">
-      <div className="w-full max-w-sm text-center">
-        <p className="font-mono text-xs tracking-[0.2em] text-[var(--color-warn)] uppercase mb-3">
-          7-day free trial
-        </p>
-        <h1 className="font-display text-2xl font-semibold mb-2">Keep your gauge running</h1>
-        <p className="text-sm text-[var(--color-text-dim)] mb-8">
-          $4/month. Cancel anytime from your account. No hidden tiers.
-        </p>
-
-        <div className="rounded-2xl bg-[var(--color-panel)] border border-[var(--color-line)] px-6 py-6 mb-6 text-left">
-          <ul className="space-y-2 text-sm text-[var(--color-text-dim)]">
-            <li>· Unlimited budgets and expense logging</li>
-            <li>· Daily allowance that adjusts automatically</li>
-            <li>· Full history across every period</li>
-          </ul>
-        </div>
-
+    <div className="min-h-screen px-4 py-10 max-w-4xl mx-auto flex flex-col justify-center">
+      {/* Top Back Nav */}
+      <div className="flex items-center justify-between mb-8">
         <button
-          onClick={handleSubscribe}
-          disabled={loading}
-          className="w-full py-3 rounded-xl bg-[var(--color-brand)] text-[var(--color-ink)] font-semibold text-sm hover:brightness-110 transition-all disabled:opacity-60"
+          onClick={() => navigate('/dashboard')}
+          className="flex items-center gap-1.5 text-xs text-[var(--color-text-dim)] hover:text-white transition-colors"
         >
-          {loading ? 'Redirecting…' : 'Start free trial'}
+          <ArrowLeft size={16} />
+          <span>Back to Dashboard</span>
         </button>
+
+        <div className="flex items-center gap-1.5 text-xs text-[var(--color-brand)] font-mono">
+          <Crown size={14} />
+          <span>BudgetDaily Pro Tier</span>
+        </div>
       </div>
+
+      <div className="text-center mb-8">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--color-brand)]/15 border border-[var(--color-brand)]/30 text-[var(--color-brand)] text-xs font-semibold uppercase tracking-wider mb-3">
+          <Sparkles size={14} />
+          <span>Simple, Ultra-Affordable Pricing</span>
+        </div>
+        <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-white">
+          Invest in Your Financial Peace of Mind
+        </h1>
+        <p className="text-sm text-[var(--color-text-dim)] mt-2 max-w-md mx-auto">
+          Start for just $1/month. Never worry about overspending your budget again.
+        </p>
+      </div>
+
+      {success ? (
+        <div className="glass-panel-elevated rounded-3xl p-12 text-center max-w-md mx-auto space-y-4 border border-[var(--color-safe)]/40">
+          <div className="w-16 h-16 rounded-full bg-[var(--color-safe)]/20 text-[var(--color-safe)] flex items-center justify-center mx-auto">
+            <CheckCircle2 size={36} />
+          </div>
+          <h2 className="text-2xl font-bold text-white">Subscription Active!</h2>
+          <p className="text-sm text-[var(--color-text-dim)]">
+            Redirecting you to your upgraded dashboard…
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {/* PRICING PLANS GRID */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {PRICING_PLANS.map((plan) => {
+              const isSelected = selectedPlan === plan.id
+              return (
+                <div
+                  key={plan.id}
+                  onClick={() => setSelectedPlan(plan.id)}
+                  className={`relative p-5 rounded-3xl border cursor-pointer transition-all flex flex-col justify-between ${
+                    isSelected
+                      ? 'bg-[rgba(245,158,11,0.12)] border-[var(--color-brand)] shadow-xl shadow-[var(--color-brand)]/15 scale-[1.03]'
+                      : 'bg-[#0e131f] border-[var(--color-line)] hover:border-slate-700 opacity-85 hover:opacity-100'
+                  }`}
+                >
+                  {plan.badge && (
+                    <span
+                      className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mb-3 self-start ${
+                        isSelected
+                          ? 'bg-[var(--color-brand)] text-[var(--color-ink)]'
+                          : 'bg-[#1e293b] text-[var(--color-text-dim)]'
+                      }`}
+                    >
+                      {plan.badge}
+                    </span>
+                  )}
+                  <div>
+                    <h3 className="text-sm font-bold text-white">{plan.name}</h3>
+                    <div className="flex items-baseline gap-1 my-2">
+                      <span className="text-3xl font-extrabold font-mono text-white">
+                        {plan.price}
+                      </span>
+                      <span className="text-xs text-[var(--color-text-dim)]">{plan.period}</span>
+                    </div>
+                    <p className="text-xs text-[var(--color-text-faint)] leading-relaxed">
+                      {plan.billing}
+                    </p>
+                  </div>
+
+                  <div className="pt-5 mt-4 border-t border-[var(--color-line-subtle)]">
+                    <button
+                      type="button"
+                      className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all ${
+                        isSelected
+                          ? 'bg-[var(--color-brand)] text-[var(--color-ink)]'
+                          : 'bg-[#182338] text-[var(--color-text-dim)] hover:text-white'
+                      }`}
+                    >
+                      {isSelected ? 'Selected' : 'Choose Plan'}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* FEATURE COMPARISON TABLE */}
+          <div className="glass-panel-elevated rounded-3xl p-6 sm:p-8 border border-[var(--color-line)]">
+            <h3 className="font-display text-lg font-bold text-white mb-4 text-center sm:text-left">
+              4 Free Features vs 10 Pro Superpowers
+            </h3>
+
+            <div className="grid sm:grid-cols-2 gap-6">
+              {/* Free features */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b border-[var(--color-line)]">
+                  <span className="text-xs font-bold uppercase text-[var(--color-text-dim)]">
+                    Free Starter Plan ($0)
+                  </span>
+                </div>
+                {FREE_FEATURES.map((feat) => (
+                  <div key={feat.id} className="flex items-start gap-2.5 text-xs text-[var(--color-text-dim)]">
+                    <Check size={15} className="text-[var(--color-safe)] mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-semibold text-white">{feat.name}</p>
+                      <p className="text-[11px] text-[var(--color-text-faint)]">{feat.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 10 Pro Features */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b border-[var(--color-brand)]/30">
+                  <Crown size={14} className="text-[var(--color-brand)]" />
+                  <span className="text-xs font-bold uppercase text-[var(--color-brand)]">
+                    Pro Member (All 10 Features)
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-2.5 max-h-72 overflow-y-auto pr-1">
+                  {PREMIUM_FEATURES.map((feat) => (
+                    <div key={feat.id} className="flex items-start gap-2.5 text-xs">
+                      <div className="w-4 h-4 rounded-full bg-[var(--color-brand)]/20 flex items-center justify-center shrink-0 mt-0.5">
+                        <Check size={11} className="text-[var(--color-brand)]" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-white">{feat.name}</p>
+                        <p className="text-[11px] text-[var(--color-text-dim)]">{feat.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* UPGRADE BUTTON */}
+            <div className="mt-8 pt-6 border-t border-[var(--color-line)] flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3 text-xs text-[var(--color-text-dim)]">
+                <Shield size={16} className="text-[var(--color-safe)] shrink-0" />
+                <span>Zero commitments. Instant cancellation anytime in 1 tap.</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSubscribe}
+                disabled={loading}
+                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-95 shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {loading ? (
+                  <span>Processing Upgrade…</span>
+                ) : (
+                  <>
+                    <Zap size={16} fill="currentColor" />
+                    <span>
+                      Confirm & Start Pro ({PRICING_PLANS.find((p) => p.id === selectedPlan)?.price})
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
