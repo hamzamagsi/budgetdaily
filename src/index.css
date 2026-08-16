@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  /* Ink-navy instrument panel, not a marketing gradient. */
+  --color-ink: #0a0f1a;
+  --color-panel: #10182b;
+  --color-panel-2: #182238;
+  --color-line: #232f47;
+
+  --color-text: #e9edf6;
+  --color-text-dim: #8a96b3;
+  --color-text-faint: #55617f;
+
+  /* Signal colors only ever appear tied to spending status — never decoration. */
+  --color-safe: #7fd8a6;
+  --color-warn: #e8b354;
+  --color-over: #e8735f;
+
+  --color-brand: #e8b354;
+
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display { font-family: var(--font-display); }
+.font-mono { font-family: var(--font-mono); }
+
+::selection {
+  background: var(--color-brand);
+  color: var(--color-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
