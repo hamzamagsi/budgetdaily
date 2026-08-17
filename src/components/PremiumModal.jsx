@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { createPolarCheckoutSession, POLAR_PLANS } from '../lib/polar'
-import confetti from 'canvas-confetti'
 import {
   Crown,
   Check,
@@ -11,6 +10,7 @@ import {
   Shield,
   CheckCircle2,
   Lock,
+  AlertCircle,
   ExternalLink,
 } from 'lucide-react'
 
@@ -74,15 +74,16 @@ export const PRICING_PLANS = [
 ]
 
 export default function PremiumModal({ isOpen, onClose, highlightFeature = '' }) {
-  const { user, isPro, subscription, upgradePlan } = useAuth()
+  const { user, isPro } = useAuth()
   const [selectedPlan, setSelectedPlan] = useState('monthly')
   const [loading, setLoading] = useState(false)
-  const [successMessage, setSuccessMessage] = useState(false)
+  const [error, setError] = useState('')
 
   if (!isOpen) return null
 
   const handleCheckout = async () => {
     setLoading(true)
+    setError('')
 
     try {
       const res = await createPolarCheckoutSession({
@@ -91,40 +92,19 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
         userId: user?.id,
       })
 
-      if (res.url && !res.simulated) {
-        // Redirect to live Polar.sh checkout
+      if (res.url) {
+        // Redirect to Polar.sh Checkout page
         window.location.href = res.url
         return
       }
-
-      // Standalone simulation fallback
-      upgradePlan(selectedPlan)
-      setLoading(false)
-      setSuccessMessage(true)
-
-      try {
-        confetti({
-          particleCount: 90,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#f59e0b', '#10b981', '#6366f1', '#ec4899'],
-        })
-      } catch (err) {}
-
-      setTimeout(() => {
-        setSuccessMessage(false)
-        onClose()
-      }, 1600)
+      throw new Error('Could not retrieve Polar checkout link')
     } catch (err) {
-      console.error('Checkout error:', err)
-      // If error occurs, activate locally so user is never blocked
-      upgradePlan(selectedPlan)
+      console.error('Polar checkout failed:', err)
       setLoading(false)
-      setSuccessMessage(true)
-      setTimeout(() => {
-        setSuccessMessage(false)
-        onClose()
-      }, 1600)
+      setError(
+        err.message ||
+          'Polar checkout could not be started. Please verify your Polar.sh product settings in polar.sh dashboard.'
+      )
     }
   }
 
@@ -156,161 +136,164 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
           </p>
         </div>
 
-        {/* Success Alert */}
-        {successMessage ? (
-          <div className="py-12 text-center space-y-3">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--color-safe)]/20 text-[var(--color-safe)]">
-              <CheckCircle2 size={36} />
-            </div>
-            <h3 className="text-xl font-bold text-white">Welcome to BudgetDaily Pro!</h3>
-            <p className="text-sm text-[var(--color-text-dim)]">All 10 premium features are now unlocked with Polar.sh.</p>
-          </div>
-        ) : (
-          <>
-            {/* PRICING SELECTOR CARDS */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-6">
-              {PRICING_PLANS.map((plan) => {
-                const isSelected = selectedPlan === plan.id
-                return (
-                  <div
-                    key={plan.id}
-                    onClick={() => setSelectedPlan(plan.id)}
-                    className={`relative p-3.5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between text-left ${
+        {/* PRICING SELECTOR CARDS */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-6">
+          {PRICING_PLANS.map((plan) => {
+            const isSelected = selectedPlan === plan.id
+            return (
+              <div
+                key={plan.id}
+                onClick={() => {
+                  setSelectedPlan(plan.id)
+                  setError('')
+                }}
+                className={`relative p-3.5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between text-left ${
+                  isSelected
+                    ? 'bg-[rgba(245,158,11,0.12)] border-[var(--color-brand)] shadow-lg shadow-[var(--color-brand)]/10 scale-[1.02]'
+                    : 'bg-[#0e131f] border-[var(--color-line)] hover:border-[var(--color-text-dim)]/40 opacity-80 hover:opacity-100'
+                }`}
+              >
+                {plan.badge && (
+                  <span
+                    className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mb-1.5 self-start ${
                       isSelected
-                        ? 'bg-[rgba(245,158,11,0.12)] border-[var(--color-brand)] shadow-lg shadow-[var(--color-brand)]/10 scale-[1.02]'
-                        : 'bg-[#0e131f] border-[var(--color-line)] hover:border-[var(--color-text-dim)]/40 opacity-80 hover:opacity-100'
+                        ? 'bg-[var(--color-brand)] text-[var(--color-ink)]'
+                        : 'bg-[#1e293b] text-[var(--color-text-dim)]'
                     }`}
                   >
-                    {plan.badge && (
-                      <span
-                        className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mb-1.5 self-start ${
-                          isSelected
-                            ? 'bg-[var(--color-brand)] text-[var(--color-ink)]'
-                            : 'bg-[#1e293b] text-[var(--color-text-dim)]'
-                        }`}
-                      >
-                        {plan.badge}
-                      </span>
-                    )}
-                    <div>
-                      <p className="text-xs font-medium text-[var(--color-text-dim)]">{plan.name}</p>
-                      <div className="flex items-baseline gap-1 mt-0.5">
-                        <span className="text-xl sm:text-2xl font-bold font-mono text-white">
-                          {plan.price}
-                        </span>
-                        <span className="text-[10px] text-[var(--color-text-faint)]">
-                          {plan.period}
-                        </span>
-                      </div>
+                    {plan.badge}
+                  </span>
+                )}
+                <div>
+                  <p className="text-xs font-medium text-[var(--color-text-dim)]">{plan.name}</p>
+                  <div className="flex items-baseline gap-1 mt-0.5">
+                    <span className="text-xl sm:text-2xl font-bold font-mono text-white">
+                      {plan.price}
+                    </span>
+                    <span className="text-[10px] text-[var(--color-text-faint)]">
+                      {plan.period}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-[var(--color-text-faint)] mt-2 leading-tight">
+                  {plan.billing}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* FEATURE COMPARISON: 4 FREE VS 10 PRO */}
+        <div className="grid sm:grid-cols-2 gap-4 mb-6">
+          {/* 4 FREE FEATURES */}
+          <div className="p-4 rounded-2xl bg-[#0e131f] border border-[var(--color-line)]">
+            <div className="flex items-center justify-between pb-2 mb-3 border-b border-[var(--color-line)]">
+              <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-dim)]">
+                Free Plan (4 Features)
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#1e293b] text-[var(--color-text-dim)] font-mono">
+                $0 / forever
+              </span>
+            </div>
+            <ul className="space-y-2.5 text-xs">
+              {FREE_FEATURES.map((feat) => (
+                <li key={feat.id} className="flex items-start gap-2 text-[var(--color-text-dim)]">
+                  <Check size={14} className="text-[var(--color-safe)] mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium text-[var(--color-text)]">{feat.name}</p>
+                    <p className="text-[11px] text-[var(--color-text-faint)]">{feat.desc}</p>
+                  </div>
+                </li>
+              ))}
+              <li className="flex items-start gap-2 text-[var(--color-text-faint)] pt-1 opacity-70">
+                <X size={14} className="text-[var(--color-over)] mt-0.5 shrink-0" />
+                <span>No custom categories, max 5 logs/day, 3-day history</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 10 PRO FEATURES */}
+          <div className="p-4 rounded-2xl bg-gradient-to-b from-[#182338] to-[#121a2c] border border-[var(--color-brand)]/40 shadow-md">
+            <div className="flex items-center justify-between pb-2 mb-3 border-b border-[var(--color-brand)]/20">
+              <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-brand)] flex items-center gap-1.5">
+                <Sparkles size={13} />
+                <span>Pro Member (10 Features)</span>
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--color-brand)] text-[var(--color-ink)] font-bold font-mono">
+                PRO
+              </span>
+            </div>
+            <div className="max-h-56 overflow-y-auto pr-1 space-y-2.5 text-xs">
+              {PREMIUM_FEATURES.map((feat) => {
+                const isHighlighted =
+                  highlightFeature && feat.name.toLowerCase().includes(highlightFeature.toLowerCase())
+                return (
+                  <div
+                    key={feat.id}
+                    className={`flex items-start gap-2 p-1.5 rounded-lg transition-colors ${
+                      isHighlighted ? 'bg-[var(--color-brand)]/20 border border-[var(--color-brand)]/30' : ''
+                    }`}
+                  >
+                    <div className="w-4 h-4 rounded-full bg-[var(--color-brand)]/20 flex items-center justify-center shrink-0 mt-0.5">
+                      <Check size={11} className="text-[var(--color-brand)]" />
                     </div>
-                    <p className="text-[10px] text-[var(--color-text-faint)] mt-2 leading-tight">
-                      {plan.billing}
-                    </p>
+                    <div>
+                      <p className="font-semibold text-white flex items-center gap-1">
+                        <span>{feat.name}</span>
+                      </p>
+                      <p className="text-[11px] text-[var(--color-text-dim)]">{feat.desc}</p>
+                    </div>
                   </div>
                 )
               })}
             </div>
+          </div>
+        </div>
 
-            {/* FEATURE COMPARISON: 4 FREE VS 10 PRO */}
-            <div className="grid sm:grid-cols-2 gap-4 mb-6">
-              {/* 4 FREE FEATURES */}
-              <div className="p-4 rounded-2xl bg-[#0e131f] border border-[var(--color-line)]">
-                <div className="flex items-center justify-between pb-2 mb-3 border-b border-[var(--color-line)]">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-dim)]">
-                    Free Plan (4 Features)
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#1e293b] text-[var(--color-text-dim)] font-mono">
-                    $0 / forever
-                  </span>
-                </div>
-                <ul className="space-y-2.5 text-xs">
-                  {FREE_FEATURES.map((feat) => (
-                    <li key={feat.id} className="flex items-start gap-2 text-[var(--color-text-dim)]">
-                      <Check size={14} className="text-[var(--color-safe)] mt-0.5 shrink-0" />
-                      <div>
-                        <p className="font-medium text-[var(--color-text)]">{feat.name}</p>
-                        <p className="text-[11px] text-[var(--color-text-faint)]">{feat.desc}</p>
-                      </div>
-                    </li>
-                  ))}
-                  <li className="flex items-start gap-2 text-[var(--color-text-faint)] pt-1 opacity-70">
-                    <X size={14} className="text-[var(--color-over)] mt-0.5 shrink-0" />
-                    <span>No custom categories, limited to 5 logs/day, 3-day history only</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* 10 PRO FEATURES */}
-              <div className="p-4 rounded-2xl bg-gradient-to-b from-[#182338] to-[#121a2c] border border-[var(--color-brand)]/40 shadow-md">
-                <div className="flex items-center justify-between pb-2 mb-3 border-b border-[var(--color-brand)]/20">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-brand)] flex items-center gap-1.5">
-                    <Sparkles size={13} />
-                    <span>Pro Member (10 Features)</span>
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--color-brand)] text-[var(--color-ink)] font-bold font-mono">
-                    PRO
-                  </span>
-                </div>
-                <div className="max-h-56 overflow-y-auto pr-1 space-y-2.5 text-xs">
-                  {PREMIUM_FEATURES.map((feat) => {
-                    const isHighlighted = highlightFeature && feat.name.toLowerCase().includes(highlightFeature.toLowerCase())
-                    return (
-                      <div
-                        key={feat.id}
-                        className={`flex items-start gap-2 p-1.5 rounded-lg transition-colors ${
-                          isHighlighted ? 'bg-[var(--color-brand)]/20 border border-[var(--color-brand)]/30' : ''
-                        }`}
-                      >
-                        <div className="w-4 h-4 rounded-full bg-[var(--color-brand)]/20 flex items-center justify-center shrink-0 mt-0.5">
-                          <Check size={11} className="text-[var(--color-brand)]" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-white flex items-center gap-1">
-                            <span>{feat.name}</span>
-                          </p>
-                          <p className="text-[11px] text-[var(--color-text-dim)]">{feat.desc}</p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
+        {/* ERROR NOTICE IF CHECKOUT FAILS */}
+        {error && (
+          <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-xs text-red-400 flex items-start gap-2.5 mb-4">
+            <AlertCircle size={16} className="shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold">Polar Payment Session Notice</p>
+              <p className="text-[11px] mt-0.5 opacity-90">{error}</p>
             </div>
-
-            {/* ACTION BUTTON */}
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={handleCheckout}
-                disabled={loading}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-[0.99] transition-all shadow-xl shadow-[var(--color-brand)]/25 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {loading ? (
-                  <span>Connecting to Polar.sh Checkout…</span>
-                ) : (
-                  <>
-                    <Zap size={18} fill="currentColor" />
-                    <span>
-                      Get Pro for{' '}
-                      {PRICING_PLANS.find((p) => p.id === selectedPlan)?.price} with Polar.sh (
-                      {PRICING_PLANS.find((p) => p.id === selectedPlan)?.name})
-                    </span>
-                  </>
-                )}
-              </button>
-
-              <div className="flex items-center justify-center gap-4 text-[11px] text-[var(--color-text-faint)]">
-                <span className="flex items-center gap-1">
-                  <Shield size={12} /> Polar.sh Verified
-                </span>
-                <span>•</span>
-                <span>Cancel anytime</span>
-                <span>•</span>
-                <span>Instant Pro Activation</span>
-              </div>
-            </div>
-          </>
+          </div>
         )}
+
+        {/* ACTION BUTTON */}
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={handleCheckout}
+            disabled={loading}
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-[0.99] transition-all shadow-xl shadow-[var(--color-brand)]/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+          >
+            {loading ? (
+              <span>Connecting to Polar.sh Checkout…</span>
+            ) : (
+              <>
+                <Zap size={18} fill="currentColor" />
+                <span>
+                  Pay{' '}
+                  {PRICING_PLANS.find((p) => p.id === selectedPlan)?.price} with Polar.sh (
+                  {PRICING_PLANS.find((p) => p.id === selectedPlan)?.name})
+                </span>
+                <ExternalLink size={14} className="ml-1 opacity-75" />
+              </>
+            )}
+          </button>
+
+          <div className="flex items-center justify-center gap-4 text-[11px] text-[var(--color-text-faint)]">
+            <span className="flex items-center gap-1">
+              <Shield size={12} /> Polar.sh Checkout Protection
+            </span>
+            <span>•</span>
+            <span>Cancel anytime</span>
+            <span>•</span>
+            <span>Active upon payment confirmation</span>
+          </div>
+        </div>
       </div>
     </div>
   )

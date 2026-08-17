@@ -17,6 +17,7 @@ export const POLAR_PLANS = {
     interval: 'month',
     label: '$1 / month',
     description: 'BudgetDaily Pro Monthly Access ($1/mo)',
+    productId: import.meta.env.VITE_POLAR_PRODUCT_MONTHLY || '',
   },
   half_yearly: {
     id: 'half_yearly',
@@ -27,6 +28,7 @@ export const POLAR_PLANS = {
     interval: '6_months',
     label: '$5 / 6 months',
     description: 'BudgetDaily Pro 6-Month Plan ($5.00)',
+    productId: import.meta.env.VITE_POLAR_PRODUCT_6MONTHS || '',
   },
   yearly: {
     id: 'yearly',
@@ -37,6 +39,7 @@ export const POLAR_PLANS = {
     interval: 'year',
     label: '$9 / year',
     description: 'BudgetDaily Pro Annual Subscription ($9/yr)',
+    productId: import.meta.env.VITE_POLAR_PRODUCT_YEARLY || '',
   },
   lifetime: {
     id: 'lifetime',
@@ -47,56 +50,43 @@ export const POLAR_PLANS = {
     interval: 'one_time',
     label: '$100 Lifetime',
     description: 'BudgetDaily Pro Lifetime VIP Pass ($100)',
+    productId: import.meta.env.VITE_POLAR_PRODUCT_LIFETIME || '',
   },
 }
 
 /**
- * Creates a Polar Checkout session via the backend serverless API (/api/create-polar-checkout)
- * or initiates client-side fallback if running standalone.
+ * Creates a Polar Checkout session via /api/create-polar-checkout
+ * Redirects to the live Polar.sh payment page.
  */
 export async function createPolarCheckoutSession({ planId, email, userId }) {
   const plan = POLAR_PLANS[planId] || POLAR_PLANS.monthly
   const successUrl = `${window.location.origin}/dashboard?checkout=success&plan=${planId}`
   const cancelUrl = `${window.location.origin}/subscribe?checkout=cancelled`
 
-  try {
-    const response = await fetch('/api/create-polar-checkout', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        planId: plan.id,
-        planName: plan.name,
-        amount: plan.priceCents,
-        currency: plan.currency,
-        email: email || '',
-        userId: userId || 'anonymous',
-        successUrl,
-        cancelUrl,
-      }),
-    })
+  const response = await fetch('/api/create-polar-checkout', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      planId: plan.id,
+      planName: plan.name,
+      amount: plan.priceCents,
+      currency: plan.currency,
+      productId: plan.productId || undefined,
+      email: email || '',
+      userId: userId || 'anonymous',
+      successUrl,
+      cancelUrl,
+    }),
+  })
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Server responded with ${response.status}`)
-    }
+  const data = await response.json().catch(() => ({}))
 
-    const data = await response.json()
-    if (data.url) {
-      return { success: true, url: data.url }
-    }
-    throw new Error('No checkout URL returned from Polar API')
-  } catch (err) {
-    console.warn('Polar API endpoint unreachable, running direct checkout handler:', err)
-
-    // Fallback: If running without backend server (e.g. Vite preview or direct client testing),
-    // return simulation data so user can test upgrade seamlessly
-    return {
-      success: true,
-      simulated: true,
-      plan: plan.id,
-      message: 'Polar checkout simulated successfully',
-    }
+  if (!response.ok || !data.url) {
+    const errorMsg = data.error || data.detail || 'Could not initiate Polar checkout session'
+    throw new Error(errorMsg)
   }
+
+  return { success: true, url: data.url }
 }
