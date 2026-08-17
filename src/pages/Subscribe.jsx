@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { PRICING_PLANS, FREE_FEATURES, PREMIUM_FEATURES } from '../components/PremiumModal'
-import { createPolarCheckoutSession } from '../lib/polar'
 import confetti from 'canvas-confetti'
 import {
   Crown,
@@ -55,26 +54,13 @@ export default function Subscribe() {
     setError('')
   }
 
-  const handleStartCheckout = async () => {
-    setLoading(true)
+  const handleStartCheckout = () => {
     setError('')
-
-    try {
-      const res = await createPolarCheckoutSession({
-        planId: selectedPlan,
-        email: user?.email,
-        userId: user?.id,
-      })
-
-      if (res.url && !res.simulated) {
-        window.location.href = res.url
-        return
-      }
-    } catch (err) {
-      console.log('Direct Polar session redirect unavailable, opening in-app payment sheet')
+    const customUrl = import.meta.env.VITE_POLAR_CHECKOUT_URL
+    if (customUrl) {
+      window.location.href = customUrl
+      return
     }
-
-    setLoading(false)
     setStep('checkout')
   }
 
@@ -409,20 +395,13 @@ export default function Subscribe() {
               <button
                 type="button"
                 onClick={handleStartCheckout}
-                disabled={loading}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-95 shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-95 shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                {loading ? (
-                  <span>Processing Polar Checkout…</span>
-                ) : (
-                  <>
-                    <Zap size={16} fill="currentColor" />
-                    <span>
-                      Pay {currentPlan.price} with Polar
-                    </span>
-                    <ExternalLink size={14} className="ml-1 opacity-75" />
-                  </>
-                )}
+                <Zap size={16} fill="currentColor" />
+                <span>
+                  Pay {currentPlan.price} with Polar
+                </span>
+                <ExternalLink size={14} className="ml-1 opacity-75" />
               </button>
             </div>
           </div>

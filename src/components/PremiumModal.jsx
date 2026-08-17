@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { createPolarCheckoutSession, POLAR_PLANS } from '../lib/polar'
+import { POLAR_PLANS } from '../lib/polar'
 import confetti from 'canvas-confetti'
 import {
   Crown,
@@ -18,6 +18,7 @@ import {
   Loader2,
   ExternalLink,
   Receipt,
+  AlertCircle,
 } from 'lucide-react'
 
 export const FREE_FEATURES = [
@@ -95,7 +96,6 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
   const [cardExpiry, setCardExpiry] = useState('')
   const [cardCvc, setCardCvc] = useState('')
   const [cardName, setCardName] = useState(user?.name || '')
-  const [cardZip, setCardZip] = useState('')
 
   if (!isOpen) return null
 
@@ -120,28 +120,14 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
     setError('')
   }
 
-  // Handle Initial Click on Yellow Button
-  const handleStartCheckout = async () => {
-    setLoading(true)
+  // Handle Initial Click on Yellow Button -> Open Card Checkout Sheet
+  const handleStartCheckout = () => {
     setError('')
-
-    // Try Polar API redirect first
-    try {
-      const res = await createPolarCheckoutSession({
-        planId: selectedPlan,
-        email: user?.email,
-        userId: user?.id,
-      })
-
-      if (res.url && !res.simulated) {
-        window.location.href = res.url
-        return
-      }
-    } catch (err) {
-      console.log('Polar API session redirect unavailable, opening secure card checkout sheet')
+    const customUrl = import.meta.env.VITE_POLAR_CHECKOUT_URL
+    if (customUrl) {
+      window.location.href = customUrl
+      return
     }
-
-    setLoading(false)
     setStep('checkout')
   }
 
@@ -168,7 +154,7 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
 
     setLoading(true)
 
-    // Process secure payment with Polar gateway
+    // Process secure payment with Polar gateway simulation
     setTimeout(() => {
       upgradePlan(selectedPlan)
       setLoading(false)
@@ -343,23 +329,13 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
               <button
                 type="button"
                 onClick={handleStartCheckout}
-                disabled={loading}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-[0.99] transition-all shadow-xl shadow-[var(--color-brand)]/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-[0.99] transition-all shadow-xl shadow-[var(--color-brand)]/25 flex items-center justify-center gap-2 cursor-pointer"
               >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2 size={16} className="animate-spin" />
-                    <span>Preparing Polar Checkout…</span>
-                  </span>
-                ) : (
-                  <>
-                    <Zap size={18} fill="currentColor" />
-                    <span>
-                      Pay {currentPlan.price} with Polar.sh ({currentPlan.name})
-                    </span>
-                    <ExternalLink size={14} className="ml-1 opacity-75" />
-                  </>
-                )}
+                <Zap size={18} fill="currentColor" />
+                <span>
+                  Pay {currentPlan.price} with Polar.sh ({currentPlan.name})
+                </span>
+                <ExternalLink size={14} className="ml-1 opacity-75" />
               </button>
 
               <div className="flex items-center justify-center gap-4 text-[11px] text-[var(--color-text-faint)]">
