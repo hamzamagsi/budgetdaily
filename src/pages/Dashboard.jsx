@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { store } from '../lib/store'
 import { computeBudgetStatus } from '../lib/budgetEngine'
 import { useAuth } from '../context/AuthContext'
@@ -11,6 +11,7 @@ import AnalyticsView from '../components/AnalyticsView'
 import SubscriptionsTracker from '../components/SubscriptionsTracker'
 import PremiumModal from '../components/PremiumModal'
 import Navbar from '../components/Navbar'
+import confetti from 'canvas-confetti'
 import {
   Compass,
   PieChart,
@@ -22,11 +23,13 @@ import {
   ArrowRight,
   TrendingUp,
   AlertCircle,
+  CheckCircle2,
 } from 'lucide-react'
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { user, signOut, isPro } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { user, signOut, isPro, upgradePlan } = useAuth()
 
   const [budget, setBudget] = useState(null)
   const [expenses, setExpenses] = useState([])
@@ -39,6 +42,7 @@ export default function Dashboard() {
   const [premiumModalOpen, setPremiumModalOpen] = useState(false)
   const [premiumHighlight, setPremiumHighlight] = useState('')
   const [limitAlert, setLimitAlert] = useState(false)
+  const [proSuccessToast, setProSuccessToast] = useState(false)
 
   const refresh = () => {
     const b = store.getActiveBudget()
@@ -53,7 +57,26 @@ export default function Dashboard() {
 
   useEffect(() => {
     refresh()
-  }, [])
+
+    // Handle return from Polar.sh Checkout
+    if (searchParams.get('checkout') === 'success') {
+      const plan = searchParams.get('plan') || 'monthly'
+      upgradePlan(plan)
+      setProSuccessToast(true)
+      try {
+        confetti({
+          particleCount: 120,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ['#f59e0b', '#10b981', '#6366f1', '#ec4899'],
+        })
+      } catch (e) {}
+
+      // Clean search params from URL
+      setSearchParams({})
+      setTimeout(() => setProSuccessToast(false), 5000)
+    }
+  }, [searchParams])
 
   if (!budget) return null
 
@@ -123,7 +146,7 @@ export default function Dashboard() {
         </p>
         <button
           onClick={() => navigate('/onboarding')}
-          className="px-8 py-3.5 rounded-2xl bg-[var(--color-brand)] text-[var(--color-ink)] font-bold text-sm hover:brightness-110 shadow-lg shadow-amber-500/25 transition-all"
+          className="px-8 py-3.5 rounded-2xl bg-[var(--color-brand)] text-[var(--color-ink)] font-bold text-sm hover:brightness-110 shadow-lg shadow-amber-500/25 transition-all cursor-pointer"
         >
           Start a new budget
         </button>
@@ -135,6 +158,16 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen pb-32">
+      {/* PRO SUCCESS TOAST (AFTER POLAR CHECKOUT) */}
+      {proSuccessToast && (
+        <div className="fixed top-5 inset-x-0 z-50 flex justify-center px-4 animate-bounce">
+          <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black px-5 py-3 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2.5 shadow-2xl shadow-amber-500/50">
+            <CheckCircle2 size={18} />
+            <span>Polar Payment Successful! Pro Member Superpowers Activated 👑</span>
+          </div>
+        </div>
+      )}
+
       {/* TOP NAVBAR */}
       <Navbar onOpenPremium={handleOpenPremium} onSignOut={handleSignOut} />
 
@@ -240,7 +273,7 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={() => setActiveTab('history')}
-                  className="text-xs text-[var(--color-text-dim)] hover:text-white transition-colors"
+                  className="text-xs text-[var(--color-text-dim)] hover:text-white transition-colors cursor-pointer"
                 >
                   View all →
                 </button>

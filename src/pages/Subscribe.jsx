@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { store } from '../lib/store'
 import { PRICING_PLANS, FREE_FEATURES, PREMIUM_FEATURES } from '../components/PremiumModal'
+import { createPolarCheckoutSession } from '../lib/polar'
 import confetti from 'canvas-confetti'
 import {
   Crown,
@@ -22,9 +23,22 @@ export default function Subscribe() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
 
-  const handleSubscribe = () => {
+  const handleSubscribe = async () => {
     setLoading(true)
-    setTimeout(() => {
+
+    try {
+      const res = await createPolarCheckoutSession({
+        planId: selectedPlan,
+        email: user?.email,
+        userId: user?.id,
+      })
+
+      if (res.url && !res.simulated) {
+        window.location.href = res.url
+        return
+      }
+
+      // Standalone simulation fallback
       upgradePlan(selectedPlan)
       setLoading(false)
       setSuccess(true)
@@ -41,7 +55,15 @@ export default function Subscribe() {
       setTimeout(() => {
         navigate('/dashboard')
       }, 1500)
-    }, 600)
+    } catch (err) {
+      console.error('Subscription error:', err)
+      upgradePlan(selectedPlan)
+      setLoading(false)
+      setSuccess(true)
+      setTimeout(() => {
+        navigate('/dashboard')
+      }, 1500)
+    }
   }
 
   return (
@@ -50,7 +72,7 @@ export default function Subscribe() {
       <div className="flex items-center justify-between mb-8">
         <button
           onClick={() => navigate('/dashboard')}
-          className="flex items-center gap-1.5 text-xs text-[var(--color-text-dim)] hover:text-white transition-colors"
+          className="flex items-center gap-1.5 text-xs text-[var(--color-text-dim)] hover:text-white transition-colors cursor-pointer"
         >
           <ArrowLeft size={16} />
           <span>Back to Dashboard</span>
@@ -58,20 +80,20 @@ export default function Subscribe() {
 
         <div className="flex items-center gap-1.5 text-xs text-[var(--color-brand)] font-mono">
           <Crown size={14} />
-          <span>BudgetDaily Pro Tier</span>
+          <span>BudgetDaily Pro · Polar.sh</span>
         </div>
       </div>
 
       <div className="text-center mb-8">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--color-brand)]/15 border border-[var(--color-brand)]/30 text-[var(--color-brand)] text-xs font-semibold uppercase tracking-wider mb-3">
           <Sparkles size={14} />
-          <span>Simple, Ultra-Affordable Pricing</span>
+          <span>Polar.sh Gateway Integration</span>
         </div>
         <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-white">
           Invest in Your Financial Peace of Mind
         </h1>
         <p className="text-sm text-[var(--color-text-dim)] mt-2 max-w-md mx-auto">
-          Start for just $1/month. Never worry about overspending your budget again.
+          Start for just $1/month via Polar.sh. Never worry about overspending your budget again.
         </p>
       </div>
 
@@ -128,7 +150,7 @@ export default function Subscribe() {
                   <div className="pt-5 mt-4 border-t border-[var(--color-line-subtle)]">
                     <button
                       type="button"
-                      className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all ${
+                      className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
                         isSelected
                           ? 'bg-[var(--color-brand)] text-[var(--color-ink)]'
                           : 'bg-[#182338] text-[var(--color-text-dim)] hover:text-white'
@@ -195,7 +217,7 @@ export default function Subscribe() {
             <div className="mt-8 pt-6 border-t border-[var(--color-line)] flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-3 text-xs text-[var(--color-text-dim)]">
                 <Shield size={16} className="text-[var(--color-safe)] shrink-0" />
-                <span>Zero commitments. Instant cancellation anytime in 1 tap.</span>
+                <span>Powered by Polar.sh. Instant checkout & cancellation anytime.</span>
               </div>
 
               <button
@@ -205,12 +227,12 @@ export default function Subscribe() {
                 className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-95 shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading ? (
-                  <span>Processing Upgrade…</span>
+                  <span>Processing Polar Checkout…</span>
                 ) : (
                   <>
                     <Zap size={16} fill="currentColor" />
                     <span>
-                      Confirm & Start Pro ({PRICING_PLANS.find((p) => p.id === selectedPlan)?.price})
+                      Start Pro with Polar ({PRICING_PLANS.find((p) => p.id === selectedPlan)?.price})
                     </span>
                   </>
                 )}

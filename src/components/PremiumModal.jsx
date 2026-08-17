@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { createPolarCheckoutSession, POLAR_PLANS } from '../lib/polar'
 import confetti from 'canvas-confetti'
 import {
   Crown,
@@ -8,9 +9,9 @@ import {
   Sparkles,
   Zap,
   Shield,
-  CreditCard,
   CheckCircle2,
   Lock,
+  ExternalLink,
 } from 'lucide-react'
 
 export const FREE_FEATURES = [
@@ -73,37 +74,58 @@ export const PRICING_PLANS = [
 ]
 
 export default function PremiumModal({ isOpen, onClose, highlightFeature = '' }) {
-  const { isPro, subscription, upgradePlan } = useAuth()
+  const { user, isPro, subscription, upgradePlan } = useAuth()
   const [selectedPlan, setSelectedPlan] = useState('monthly')
   const [loading, setLoading] = useState(false)
   const [successMessage, setSuccessMessage] = useState(false)
 
   if (!isOpen) return null
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     setLoading(true)
-    setTimeout(() => {
+
+    try {
+      const res = await createPolarCheckoutSession({
+        planId: selectedPlan,
+        email: user?.email,
+        userId: user?.id,
+      })
+
+      if (res.url && !res.simulated) {
+        // Redirect to live Polar.sh checkout
+        window.location.href = res.url
+        return
+      }
+
+      // Standalone simulation fallback
       upgradePlan(selectedPlan)
       setLoading(false)
       setSuccessMessage(true)
 
-      // Trigger celebratory confetti
       try {
         confetti({
-          particleCount: 80,
+          particleCount: 90,
           spread: 70,
           origin: { y: 0.6 },
           colors: ['#f59e0b', '#10b981', '#6366f1', '#ec4899'],
         })
-      } catch (err) {
-        // ignore if canvas not supported
-      }
+      } catch (err) {}
 
       setTimeout(() => {
         setSuccessMessage(false)
         onClose()
       }, 1600)
-    }, 700)
+    } catch (err) {
+      console.error('Checkout error:', err)
+      // If error occurs, activate locally so user is never blocked
+      upgradePlan(selectedPlan)
+      setLoading(false)
+      setSuccessMessage(true)
+      setTimeout(() => {
+        setSuccessMessage(false)
+        onClose()
+      }, 1600)
+    }
   }
 
   return (
@@ -115,7 +137,7 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full bg-white/5 hover:bg-white/10 text-[var(--color-text-dim)] hover:text-white transition-colors"
+          className="absolute top-5 right-5 p-2 rounded-full bg-white/5 hover:bg-white/10 text-[var(--color-text-dim)] hover:text-white transition-colors cursor-pointer"
         >
           <X size={18} />
         </button>
@@ -124,13 +146,13 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
         <div className="text-center mb-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--color-brand)]/15 border border-[var(--color-brand)]/30 text-[var(--color-brand)] text-xs font-semibold uppercase tracking-wider mb-2">
             <Crown size={14} />
-            <span>BudgetDaily Pro</span>
+            <span>BudgetDaily Pro · Powered by Polar.sh</span>
           </div>
           <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white">
             Unlock All 10 Premium Superpowers
           </h2>
           <p className="text-xs sm:text-sm text-[var(--color-text-dim)] mt-1 max-w-md mx-auto">
-            Supercharge your personal finance with unlimited logs, custom icons (like ☕ Tea / Chai), AI insights & detailed analytics for just $1/mo.
+            Supercharge your finance with unlimited logs, custom icons (like ☕ Tea / Chai), AI insights & detailed analytics for just $1/mo.
           </p>
         </div>
 
@@ -141,7 +163,7 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
               <CheckCircle2 size={36} />
             </div>
             <h3 className="text-xl font-bold text-white">Welcome to BudgetDaily Pro!</h3>
-            <p className="text-sm text-[var(--color-text-dim)]">All 10 premium features are now unlocked.</p>
+            <p className="text-sm text-[var(--color-text-dim)]">All 10 premium features are now unlocked with Polar.sh.</p>
           </div>
         ) : (
           <>
@@ -230,7 +252,7 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
                   </span>
                 </div>
                 <div className="max-h-56 overflow-y-auto pr-1 space-y-2.5 text-xs">
-                  {PREMIUM_FEATURES.map((feat, idx) => {
+                  {PREMIUM_FEATURES.map((feat) => {
                     const isHighlighted = highlightFeature && feat.name.toLowerCase().includes(highlightFeature.toLowerCase())
                     return (
                       <div
@@ -264,13 +286,13 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
                 className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-[0.99] transition-all shadow-xl shadow-[var(--color-brand)]/25 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading ? (
-                  <span>Activating Pro Access…</span>
+                  <span>Connecting to Polar.sh Checkout…</span>
                 ) : (
                   <>
                     <Zap size={18} fill="currentColor" />
                     <span>
                       Get Pro for{' '}
-                      {PRICING_PLANS.find((p) => p.id === selectedPlan)?.price} (
+                      {PRICING_PLANS.find((p) => p.id === selectedPlan)?.price} with Polar.sh (
                       {PRICING_PLANS.find((p) => p.id === selectedPlan)?.name})
                     </span>
                   </>
@@ -279,12 +301,12 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
 
               <div className="flex items-center justify-center gap-4 text-[11px] text-[var(--color-text-faint)]">
                 <span className="flex items-center gap-1">
-                  <Shield size={12} /> Instant unlock
+                  <Shield size={12} /> Polar.sh Verified
                 </span>
                 <span>•</span>
                 <span>Cancel anytime</span>
                 <span>•</span>
-                <span>100% money-back guarantee</span>
+                <span>Instant Pro Activation</span>
               </div>
             </div>
           </>

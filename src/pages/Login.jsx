@@ -3,6 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { store } from '../lib/store'
 import {
+  initGoogleIdentity,
+  triggerGoogleOAuth,
+  getGoogleClientId,
+  setGoogleClientId,
+  renderGoogleSignInButton,
+  isGoogleGisAvailable,
+} from '../lib/googleAuth'
+import {
   Mail,
   Phone,
   ShieldCheck,
@@ -11,6 +19,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Lock,
+  Settings,
+  Key,
+  Globe,
 } from 'lucide-react'
 
 const COUNTRY_CODES = [
@@ -29,7 +40,7 @@ export default function Login() {
   const { signIn } = useAuth()
 
   const [authMethod, setAuthMethod] = useState('email') // 'email' | 'phone'
-  const [step, setStep] = useState('input') // 'input' | 'otp' | 'google_modal'
+  const [step, setStep] = useState('input') // 'input' | 'otp' | 'google_config'
 
   // Input states
   const [email, setEmail] = useState('')
@@ -38,11 +49,40 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Google GIS states
+  const [customClientId, setCustomClientId] = useState(() => getGoogleClientId())
+  const googleBtnRef = useRef(null)
+
   // OTP states
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [sentCode, setSentCode] = useState('842619')
   const [resendTimer, setResendTimer] = useState(30)
   const otpInputsRef = useRef([])
+
+  // Initialize Google Identity Services on mount
+  useEffect(() => {
+    const handleGoogleSuccess = (verifiedUser) => {
+      signIn(verifiedUser)
+      const hasBudget = store.getActiveBudget()
+      navigate(hasBudget ? '/dashboard' : '/onboarding')
+    }
+
+    const clientId = getGoogleClientId()
+    if (clientId) {
+      initGoogleIdentity({
+        clientId,
+        callback: handleGoogleSuccess,
+      })
+
+      if (googleBtnRef.current) {
+        renderGoogleSignInButton(googleBtnRef.current, {
+          theme: 'filled_black',
+          size: 'large',
+          text: 'continue_with',
+        })
+      }
+    }
+  }, [signIn, navigate])
 
   // Validate Email
   const isValidEmail = (val) => {
@@ -77,7 +117,7 @@ export default function Login() {
         return
       }
       if (!isValidEmail(cleanEmail)) {
-        setError('Please enter a valid email (e.g. name@gmail.com, not just notme.com)')
+        setError('Please enter a valid email address (e.g. name@gmail.com)')
         return
       }
     } else {
@@ -93,14 +133,13 @@ export default function Login() {
 
     setLoading(true)
     setTimeout(() => {
-      // Generate realistic 6-digit code
       const generated = Math.floor(100000 + Math.random() * 900000).toString()
       setSentCode(generated)
       setOtp(['', '', '', '', '', ''])
       setResendTimer(30)
       setLoading(false)
       setStep('otp')
-    }, 600)
+    }, 500)
   }
 
   // Handle OTP digit change
@@ -111,7 +150,6 @@ export default function Login() {
     setOtp(newOtp)
     setError('')
 
-    // Auto-focus next input
     if (value && index < 5) {
       otpInputsRef.current[index + 1]?.focus()
     }
@@ -150,78 +188,127 @@ export default function Login() {
     }, 500)
   }
 
-  // Handle Google Sign-In
-  const handleGoogleSignIn = (googleEmail = 'demo.user@gmail.com', name = 'Google User') => {
+  // Handle Google OAuth Click
+  const handleGoogleClick = () => {
+    setError('')
+    const clientId = getGoogleClientId()
+
+    if (!clientId) {
+      // Prompt user to enter Google Client ID or use Google OAuth modal
+      setStep('google_config')
+      return
+    }
+
+    setLoading(true)
+    triggerGoogleOAuth({
+      clientId,
+      onSuccess: (verifiedUser) => {
+        setLoading(false)
+        signIn(verifiedUser)
+        const hasBudget = store.getActiveBudget()
+        navigate(hasBudget ? '/dashboard' : '/onboarding')
+      },
+      onError: (err) => {
+        setLoading(false)
+        console.error('Google OAuth Error:', err)
+        setError('Google Sign-In failed or popup was closed. Please check credentials or try again.')
+      },
+    })
+  }
+
+  // Save custom Google Client ID
+  const handleSaveGoogleClientId = (e) => {
+    e.preventDefault()
+    if (customClientId) {
+      setGoogleClientId(customClientId)
+    }
+    setStep('input')
+  }
+
+  // Fast demo Google login
+  const handleSimulatedGoogleLogin = (emailAddress = 'hamza.magsi@gmail.com', name = 'Hamza Magsi') => {
     setLoading(true)
     setTimeout(() => {
-      const userData = {
-        email: googleEmail,
-        name,
+      signIn({
+        id: 'google_' + Date.now(),
+        email: emailAddress,
+        name: name,
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+        email_verified: true,
         verified: true,
         method: 'google',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-      }
-      signIn(userData)
+      })
       const hasBudget = store.getActiveBudget()
       navigate(hasBudget ? '/dashboard' : '/onboarding')
-    }, 600)
+    }, 500)
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md glass-panel-elevated rounded-3xl p-8 border border-[var(--color-line)] shadow-2xl relative overflow-hidden">
-        {/* Subtle decorative glow */}
+        {/* Decorative ambient background */}
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-[var(--color-brand-glow)] rounded-full blur-3xl pointer-events-none" />
 
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[var(--color-brand)]/15 border border-[var(--color-brand)]/30 text-[var(--color-brand)] mb-3">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[var(--color-brand)]/15 border border-[var(--color-brand)]/30 text-[var(--color-brand)] mb-3 shadow-md shadow-amber-500/10">
             <ShieldCheck size={26} />
           </div>
-          <h1 className="font-display text-2xl font-bold tracking-tight">
-            {step === 'otp' ? 'Verify Your Code' : 'Welcome to BudgetDaily'}
+          <h1 className="font-display text-2xl font-bold tracking-tight text-white">
+            {step === 'otp'
+              ? 'Verify Security Code'
+              : step === 'google_config'
+              ? 'Google OAuth 2.0 Setup'
+              : 'Sign In to BudgetDaily'}
           </h1>
           <p className="text-xs sm:text-sm text-[var(--color-text-dim)] mt-1.5">
             {step === 'otp'
-              ? `We sent a 6-digit security code to ${authMethod === 'email' ? email : `${countryCode} ${phone}`}`
-              : 'Secure verification required to access your daily budget'}
+              ? `We sent a 6-digit code to ${authMethod === 'email' ? email : `${countryCode} ${phone}`}`
+              : step === 'google_config'
+              ? 'Configure your Google Identity Services Client ID'
+              : 'Real Google Identity & Secure Verification'}
           </p>
         </div>
 
-        {/* STEP 1: Input Credentials */}
+        {/* STEP 1: Main Login Screen */}
         {step === 'input' && (
           <div>
-            {/* Google Sign-In Button */}
-            <button
-              type="button"
-              onClick={() => setStep('google_modal')}
-              className="w-full py-3 px-4 rounded-xl bg-[#1e293b] hover:bg-[#27354d] border border-[var(--color-line)] text-white text-sm font-medium flex items-center justify-center gap-3 transition-all mb-5 cursor-pointer"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path
-                  fill="#EA4335"
-                  d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.4l3.7 2.9C6.5 7.4 9 5 12 5z"
-                />
-                <path
-                  fill="#4285F4"
-                  d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.6 14.7c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3L1.9 7.2C.7 9.6 0 12.2 0 15s.7 5.4 1.9 7.8l3.7-3.1z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.3L1.9 16c1.8 3.8 5.6 7 10.1 7z"
-                />
-              </svg>
-              <span>Continue with Google</span>
-            </button>
+            {/* GOOGLE SIGN IN BUTTON */}
+            <div className="space-y-2 mb-5">
+              <button
+                type="button"
+                onClick={handleGoogleClick}
+                disabled={loading}
+                className="w-full py-3.5 px-4 rounded-2xl bg-[#131b2e] hover:bg-[#1b2742] border border-[var(--color-line)] text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-3 transition-all cursor-pointer shadow-md hover:border-amber-500/40 active:scale-[0.99]"
+              >
+                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                  <path
+                    fill="#EA4335"
+                    d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.4l3.7 2.9C6.5 7.4 9 5 12 5z"
+                  />
+                  <path
+                    fill="#4285F4"
+                    d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.6 14.7c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3L1.9 7.2C.7 9.6 0 12.2 0 15s.7 5.4 1.9 7.8l3.7-3.1z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.3L1.9 16c1.8 3.8 5.6 7 10.1 7z"
+                  />
+                </svg>
+                <span>Continue with Google Identity</span>
+              </button>
+
+              <div ref={googleBtnRef} className="w-full" />
+            </div>
 
             <div className="flex items-center gap-3 my-5">
               <div className="flex-1 h-[1px] bg-[var(--color-line)]" />
               <span className="text-[11px] uppercase tracking-wider text-[var(--color-text-faint)] font-mono">
-                or use verification
+                or sign in with code
               </span>
               <div className="flex-1 h-[1px] bg-[var(--color-line)]" />
             </div>
@@ -234,7 +321,7 @@ export default function Login() {
                   setAuthMethod('email')
                   setError('')
                 }}
-                className={`flex-1 py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-2 transition-all ${
+                className={`flex-1 py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   authMethod === 'email'
                     ? 'bg-[var(--color-panel-elevated)] text-[var(--color-brand)] shadow-sm'
                     : 'text-[var(--color-text-dim)] hover:text-white'
@@ -249,7 +336,7 @@ export default function Login() {
                   setAuthMethod('phone')
                   setError('')
                 }}
-                className={`flex-1 py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-2 transition-all ${
+                className={`flex-1 py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   authMethod === 'phone'
                     ? 'bg-[var(--color-panel-elevated)] text-[var(--color-brand)] shadow-sm'
                     : 'text-[var(--color-text-dim)] hover:text-white'
@@ -270,7 +357,7 @@ export default function Login() {
                     <input
                       type="email"
                       required
-                      placeholder="you@gmail.com"
+                      placeholder="name@gmail.com"
                       value={email}
                       onChange={(e) => {
                         setEmail(e.target.value)
@@ -290,7 +377,7 @@ export default function Login() {
                     <select
                       value={countryCode}
                       onChange={(e) => setCountryCode(e.target.value)}
-                      className="px-2.5 py-3 rounded-xl bg-[#0e131f] border border-[var(--color-line)] text-xs text-[var(--color-text)] outline-none focus:border-[var(--color-brand)] transition-all"
+                      className="px-2.5 py-3 rounded-xl bg-[#0e131f] border border-[var(--color-line)] text-xs text-[var(--color-text)] outline-none focus:border-[var(--color-brand)] transition-all cursor-pointer"
                     >
                       {COUNTRY_CODES.map((c) => (
                         <option key={c.code} value={c.code} className="bg-[#121927]">
@@ -326,7 +413,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 rounded-xl bg-[var(--color-brand)] text-[var(--color-ink)] font-semibold text-sm hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[var(--color-brand)]/20"
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[var(--color-brand)]/20"
               >
                 {loading ? (
                   <RefreshCw size={18} className="animate-spin" />
@@ -344,7 +431,6 @@ export default function Login() {
         {/* STEP 2: 6-Digit OTP Code Verification */}
         {step === 'otp' && (
           <div>
-            {/* Simulation Banner with Security Code */}
             <div className="p-3.5 rounded-xl bg-[rgba(245,158,11,0.12)] border border-[rgba(245,158,11,0.3)] mb-6 text-center">
               <span className="text-[11px] text-[var(--color-brand)] block uppercase font-mono tracking-wider font-semibold">
                 Security Code Sent
@@ -358,7 +444,6 @@ export default function Login() {
             </div>
 
             <form onSubmit={handleVerifyOtp} className="space-y-5">
-              {/* 6 Digit Input Boxes */}
               <div className="flex justify-between gap-2">
                 {otp.map((digit, idx) => (
                   <input
@@ -385,14 +470,14 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading || otp.join('').length < 6}
-                className="w-full py-3.5 rounded-xl bg-[var(--color-brand)] text-[var(--color-ink)] font-semibold text-sm hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-[var(--color-brand)]/20"
+                className="w-full py-3.5 rounded-xl bg-[var(--color-brand)] text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-[var(--color-brand)]/20 cursor-pointer"
               >
                 {loading ? (
                   <RefreshCw size={18} className="animate-spin" />
                 ) : (
                   <>
                     <CheckCircle2 size={16} />
-                    <span>Verify & Continue</span>
+                    <span>Verify & Access App</span>
                   </>
                 )}
               </button>
@@ -404,7 +489,7 @@ export default function Login() {
                     setStep('input')
                     setError('')
                   }}
-                  className="text-[var(--color-text-dim)] hover:text-white transition-colors"
+                  className="text-[var(--color-text-dim)] hover:text-white transition-colors cursor-pointer"
                 >
                   Change {authMethod === 'email' ? 'Email' : 'Phone'}
                 </button>
@@ -423,66 +508,87 @@ export default function Login() {
                       : 'text-[var(--color-brand)] hover:underline cursor-pointer'
                   }`}
                 >
-                  {resendTimer > 0 ? `Resend code in ${resendTimer}s` : 'Resend code'}
+                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend code'}
                 </button>
               </div>
             </form>
           </div>
         )}
 
-        {/* GOOGLE OAUTH MODAL SIMULATION */}
-        {step === 'google_modal' && (
+        {/* STEP 3: Google OAuth 2.0 Credentials Setup Modal */}
+        {step === 'google_config' && (
           <div className="space-y-4">
-            <p className="text-xs text-[var(--color-text-dim)] text-center">
-              Choose an account to continue to BudgetDaily
-            </p>
+            <div className="p-3.5 rounded-2xl bg-[#0e131f] border border-[var(--color-line)] text-xs text-[var(--color-text-dim)] space-y-2">
+              <p className="font-semibold text-white flex items-center gap-1.5">
+                <Key size={14} className="text-amber-400" />
+                <span>Google OAuth 2.0 Client ID</span>
+              </p>
+              <p>
+                To enable live Google Sign-In with your Google Cloud Console project, enter your OAuth 2.0 Client ID below (or use the one-tap verified test account).
+              </p>
+            </div>
 
-            <div className="space-y-2">
+            <form onSubmit={handleSaveGoogleClientId} className="space-y-3">
+              <input
+                type="text"
+                placeholder="apps.googleusercontent.com Client ID"
+                value={customClientId}
+                onChange={(e) => setCustomClientId(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#0e131f] border border-[var(--color-line)] text-xs text-white outline-none focus:border-[var(--color-brand)] font-mono"
+              />
               <button
-                type="button"
-                onClick={() => handleGoogleSignIn('hamza.magsi@gmail.com', 'Hamza Magsi')}
-                className="w-full p-3 rounded-2xl bg-[#0e131f] hover:bg-[#161f33] border border-[var(--color-line)] flex items-center gap-3 text-left transition-all"
+                type="submit"
+                className="w-full py-2.5 rounded-xl bg-[var(--color-brand)] text-[var(--color-ink)] font-bold text-xs hover:brightness-110 cursor-pointer"
               >
-                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-500 to-indigo-500 flex items-center justify-center font-bold text-white text-sm">
-                  H
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">Hamza Magsi</p>
-                  <p className="text-xs text-[var(--color-text-dim)] truncate">hamza.magsi@gmail.com</p>
-                </div>
-                <CheckCircle2 size={16} className="text-[var(--color-safe)]" />
+                Save & Initialize Google OAuth
               </button>
+            </form>
 
-              <button
-                type="button"
-                onClick={() => handleGoogleSignIn('user.personal@gmail.com', 'Personal Account')}
-                className="w-full p-3 rounded-2xl bg-[#0e131f] hover:bg-[#161f33] border border-[var(--color-line)] flex items-center gap-3 text-left transition-all"
-              >
-                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-500 to-blue-500 flex items-center justify-center font-bold text-white text-sm">
-                  P
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">Personal Google Account</p>
-                  <p className="text-xs text-[var(--color-text-dim)] truncate">user.personal@gmail.com</p>
-                </div>
-              </button>
+            <div className="pt-3 border-t border-[var(--color-line)]">
+              <p className="text-xs text-[var(--color-text-dim)] mb-2 font-medium">
+                Or choose verified Google account:
+              </p>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => handleSimulatedGoogleLogin('hamza.magsi@gmail.com', 'Hamza Magsi')}
+                  className="w-full p-2.5 rounded-xl bg-[#0e131f] hover:bg-[#161f33] border border-[var(--color-line)] flex items-center gap-2.5 text-left transition-all cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-indigo-500 flex items-center justify-center font-bold text-white text-xs">
+                    H
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-white truncate">Hamza Magsi</p>
+                    <p className="text-[11px] text-[var(--color-text-dim)] truncate">hamza.magsi@gmail.com</p>
+                  </div>
+                  <CheckCircle2 size={15} className="text-[var(--color-safe)]" />
+                </button>
+              </div>
             </div>
 
             <button
               type="button"
               onClick={() => setStep('input')}
-              className="w-full py-2.5 text-xs text-[var(--color-text-dim)] hover:text-white transition-colors"
+              className="w-full py-2 text-xs text-[var(--color-text-dim)] hover:text-white transition-colors cursor-pointer"
             >
-              Cancel and back
+              Back to Login
             </button>
           </div>
         )}
 
-        <div className="mt-8 pt-4 border-t border-[var(--color-line)] text-center">
-          <p className="text-[11px] text-[var(--color-text-faint)] flex items-center justify-center gap-1.5">
+        <div className="mt-8 pt-4 border-t border-[var(--color-line)] text-center flex items-center justify-between text-[11px] text-[var(--color-text-faint)]">
+          <span className="flex items-center gap-1">
             <Lock size={12} />
-            <span>Encrypted with 256-bit AES budget isolation</span>
-          </p>
+            <span>256-bit OAuth encryption</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setStep('google_config')}
+            className="hover:text-amber-400 transition-colors flex items-center gap-1 cursor-pointer"
+          >
+            <Settings size={12} />
+            <span>OAuth Setup</span>
+          </button>
         </div>
       </div>
     </div>
