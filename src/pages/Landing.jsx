@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Compass,
@@ -12,9 +13,22 @@ import {
   Layers,
 } from 'lucide-react'
 import { FREE_FEATURES, PREMIUM_FEATURES, PRICING_PLANS } from '../components/PremiumModal'
+import { useAuth } from '../context/AuthContext'
+import { store } from '../lib/store'
 
 export default function Landing() {
   const navigate = useNavigate()
+  const { user, loading } = useAuth()
+
+  // THE FIX: if a session already exists (e.g. we just landed here straight
+  // off a Google OAuth redirect), skip the marketing page and continue
+  // straight into the app instead of showing a logged-out header.
+  useEffect(() => {
+    if (!loading && user) {
+      const hasBudget = store.getActiveBudget()
+      navigate(hasBudget ? '/dashboard' : '/onboarding', { replace: true })
+    }
+  }, [user, loading])
 
   return (
     <div className="min-h-screen flex flex-col selection:bg-amber-400 selection:text-black">

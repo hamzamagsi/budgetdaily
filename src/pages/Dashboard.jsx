@@ -119,8 +119,12 @@ export default function Dashboard() {
     refresh()
   }
 
-  const handleSignOut = () => {
-    signOut()
+  const handleSignOut = async () => {
+    // Must await — signOut() now waits on the real Supabase sign-out too,
+    // so navigating before it resolves left the user state stale for a
+    // moment, causing Landing to think you were still logged in and bounce
+    // you right back (the dashboard <-> login flicker).
+    await signOut()
     navigate('/')
   }
 

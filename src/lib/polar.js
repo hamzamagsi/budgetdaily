@@ -4,7 +4,9 @@
 
 export const POLAR_CONFIG = {
   apiBase: 'https://api.polar.sh/v1',
-  defaultToken: 'polar_oat_uURiXVRnxqmxR9K5P5wmzE69WnhJZ3TBTbWYw3p4Zdq',
+  // No token here on purpose — this file runs in the browser. The real
+  // access token lives ONLY in Vercel's env vars and is used server-side
+  // inside api/create-polar-checkout.js, never shipped to the client.
 }
 
 export const POLAR_PLANS = {

@@ -6,19 +6,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' })
   }
 
-  // Require POLAR_ACCESS_TOKEN to be set in the environment.
   const token = process.env.POLAR_ACCESS_TOKEN
   const { planId, planName, amount, currency = 'USD', productId, email, userId, successUrl, cancelUrl } = req.body || {}
 
   if (!token) {
-    // Fail loudly instead of falling back to a baked-in token to avoid accidental bypass.
-    return res.status(500).json({ error: 'Polar Access Token is missing' })
+    return res.status(500).json({ error: 'Polar Access Token is missing — set POLAR_ACCESS_TOKEN in your environment variables.' })
   }
 
   try {
     // Build payload for Polar API checkout
     const bodyPayload = {
-      // Polar expects an explicit customer email when available; omit if not provided.
       customer_email: email || undefined,
       success_url: successUrl || `${req.headers.origin || ''}/dashboard?checkout=success`,
       cancel_url: cancelUrl || `${req.headers.origin || ''}/dashboard?checkout=canceled`,
@@ -34,7 +31,6 @@ export default async function handler(req, res) {
       bodyPayload.product_id = productId
     }
 
-    // Include an explicit amount/currency only when provided (Polar's API varies by account)
     if (typeof amount !== 'undefined') {
       bodyPayload.amount = amount
       bodyPayload.currency = currency
@@ -50,7 +46,6 @@ export default async function handler(req, res) {
       body: JSON.stringify(bodyPayload),
     })
 
-    // Attempt to parse JSON response; if parsing fails, surface a generic error.
     let data
     try {
       data = await polarRes.json()
@@ -60,7 +55,6 @@ export default async function handler(req, res) {
     }
 
     if (!polarRes.ok) {
-      // Don't log secrets; only log the error body returned by Polar for debugging.
       console.error('Polar API Error:', JSON.stringify(data))
       return res.status(polarRes.status).json({
         error:
