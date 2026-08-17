@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { POLAR_PLANS } from '../lib/polar'
 import confetti from 'canvas-confetti'
 import {
   Crown,
@@ -24,20 +23,20 @@ import {
 export const FREE_FEATURES = [
   { id: '1', name: 'Daily Allowance Engine', desc: 'Automatic calculation based on total days' },
   { id: '2', name: 'Basic Spend Logging', desc: 'Up to 5 transactions per day' },
-  { id: '3', name: 'Semi-Circle Fuel Gauge', desc: 'Real-time daily status & warning alerts' },
-  { id: '4', name: '3-Day Spending History', desc: 'Review your recent 3 days of purchases' },
+  { id: '3', name: 'Calendar Date Matrix', desc: 'Review day-by-day past transactions' },
+  { id: '4', name: '3-Day Spending History', desc: 'Basic recent purchase history' },
 ]
 
 export const PREMIUM_FEATURES = [
   { id: 'p1', name: 'Unlimited Daily Spend Logging', desc: 'No limits — log every chai, snack, and bill without restriction' },
-  { id: 'p2', name: 'Custom Categories & Icon Maker', desc: 'Create unique categories with custom icons (☕ Chai, 🍕 Pizza, 🎮 Gaming)' },
+  { id: 'p2', name: 'Custom Categories & Icon Maker', desc: 'Create unique categories with 30+ custom icons (☕ Chai, 🍕 Pizza, 🎮 Gaming)' },
   { id: 'p3', name: 'Visual Analytics & Spending Breakdown', desc: 'Interactive category charts, daily trends, and spending distributions' },
   { id: 'p4', name: 'Export to CSV & PDF Reports', desc: 'Download clean financial statements for spreadsheets and tax tracking' },
   { id: 'p5', name: 'Recurring Subscriptions & Bills Tracker', desc: 'Track Netflix, Spotify, Gym, Rent with automatic daily deduction forecasts' },
   { id: 'p6', name: 'Smart AI Spending Advisor', desc: 'Personalized recommendations on where you can optimize daily spends' },
   { id: 'p7', name: 'Multi-Payment & Wallet Tracking', desc: 'Separate Cash 💵, Debit/Credit Card 💳, and Digital Wallets 📱' },
   { id: 'p8', name: 'Savings Goal Pots & Daily Rollover', desc: 'Auto-transfer leftover daily allowance into dedicated savings funds' },
-  { id: 'p9', name: 'Luxury OLED Themes & Customization', desc: 'Obsidian Black, Emerald Gold, Midnight Sapphire, and Sunset Amber palettes' },
+  { id: 'p9', name: 'Category Budget Allocations', desc: 'Set custom monthly limit targets per category' },
   { id: 'p10', name: 'Cloud Sync & Multi-Device Backup', desc: 'Instant real-time sync across your iPhone, Android, and Desktop' },
 ]
 
@@ -101,7 +100,6 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
 
   const currentPlan = PRICING_PLANS.find((p) => p.id === selectedPlan) || PRICING_PLANS[0]
 
-  // Format Card Number input
   const handleCardNumberChange = (e) => {
     const raw = e.target.value.replace(/\D/g, '').slice(0, 16)
     const formatted = raw.replace(/(\d{4})/g, '$1 ').trim()
@@ -109,7 +107,6 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
     setError('')
   }
 
-  // Format Expiry input
   const handleExpiryChange = (e) => {
     const raw = e.target.value.replace(/\D/g, '').slice(0, 4)
     if (raw.length >= 2) {
@@ -120,7 +117,6 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
     setError('')
   }
 
-  // Handle Initial Click on Yellow Button -> Open Card Checkout Sheet
   const handleStartCheckout = () => {
     setError('')
     const customUrl = import.meta.env.VITE_POLAR_CHECKOUT_URL
@@ -131,7 +127,6 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
     setStep('checkout')
   }
 
-  // Handle Card Payment Submission
   const handleProcessPayment = (e) => {
     e.preventDefault()
     setError('')
@@ -154,7 +149,6 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
 
     setLoading(true)
 
-    // Process secure payment with Polar gateway simulation
     setTimeout(() => {
       upgradePlan(selectedPlan)
       setLoading(false)
@@ -165,53 +159,52 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
           particleCount: 120,
           spread: 80,
           origin: { y: 0.55 },
-          colors: ['#f59e0b', '#10b981', '#6366f1', '#ec4899'],
+          colors: ['#6c5ce7', '#10b981', '#f59e0b'],
         })
       } catch (err) {}
 
       setTimeout(() => {
         onClose()
         setStep('plans')
-      }, 2200)
+        window.dispatchEvent(new Event('storage_change'))
+      }, 2000)
     }, 1200)
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-2xl my-8 glass-panel-elevated rounded-3xl p-6 sm:p-8 border border-[var(--color-brand)]/40 shadow-2xl overflow-hidden">
-        {/* Decorative ambient background */}
-        <div className="absolute top-0 right-0 w-80 h-80 bg-[var(--color-brand-glow)] rounded-full blur-3xl pointer-events-none -z-10" />
-
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-[#e8e4f5] my-auto animate-in fade-in zoom-in-95">
         {/* Close Button */}
         <button
+          type="button"
           onClick={() => {
             onClose()
             setStep('plans')
           }}
-          className="absolute top-5 right-5 p-2 rounded-full bg-white/5 hover:bg-white/10 text-[var(--color-text-dim)] hover:text-white transition-colors cursor-pointer"
+          className="absolute top-5 right-5 p-2 rounded-full bg-[#f8f6ff] hover:bg-[#ede9fe] text-[#64748b] hover:text-[#1f2430] transition-colors cursor-pointer"
         >
           <X size={18} />
         </button>
 
-        {/* STEP 1: Plan Selection & Feature Overview */}
+        {/* STEP 1: PLANS & COMPARISON */}
         {step === 'plans' && (
-          <div>
+          <div className="space-y-6">
             {/* Header */}
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--color-brand)]/15 border border-[var(--color-brand)]/30 text-[var(--color-brand)] text-xs font-semibold uppercase tracking-wider mb-2">
+            <div className="text-center">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#ede9fe] text-[#6c5ce7] text-xs font-bold uppercase tracking-wider mb-2 font-mono">
                 <Crown size={14} />
                 <span>BudgetDaily Pro · Powered by Polar.sh</span>
               </div>
-              <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              <h2 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1f2430]">
                 Unlock All 10 Premium Superpowers
               </h2>
-              <p className="text-xs sm:text-sm text-[var(--color-text-dim)] mt-1 max-w-md mx-auto">
+              <p className="text-xs sm:text-sm text-[#64748b] mt-1.5 max-w-md mx-auto">
                 Supercharge your finance with unlimited logs, custom icons (like ☕ Tea / Chai), AI insights & detailed analytics for just $1/mo.
               </p>
             </div>
 
-            {/* PRICING SELECTOR CARDS */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-6">
+            {/* PRICING SELECTOR CARDS (LIGHT PASTEL STYLE) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {PRICING_PLANS.map((plan) => {
                 const isSelected = selectedPlan === plan.id
                 return (
@@ -221,35 +214,35 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
                       setSelectedPlan(plan.id)
                       setError('')
                     }}
-                    className={`relative p-3.5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between text-left ${
+                    className={`relative p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between text-left ${
                       isSelected
-                        ? 'bg-[rgba(245,158,11,0.12)] border-[var(--color-brand)] shadow-lg shadow-[var(--color-brand)]/10 scale-[1.02]'
-                        : 'bg-[#0e131f] border-[var(--color-line)] hover:border-[var(--color-text-dim)]/40 opacity-80 hover:opacity-100'
+                        ? 'bg-[#ede9fe] border-2 border-[#6c5ce7] shadow-lg shadow-[#6c5ce7]/15 scale-[1.02]'
+                        : 'bg-[#f8f6ff] border-[#e8e4f5] hover:border-[#cbd5e1] hover:bg-white'
                     }`}
                   >
                     {plan.badge && (
                       <span
-                        className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mb-1.5 self-start ${
+                        className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mb-2 self-start ${
                           isSelected
-                            ? 'bg-[var(--color-brand)] text-[var(--color-ink)]'
-                            : 'bg-[#1e293b] text-[var(--color-text-dim)]'
+                            ? 'bg-[#6c5ce7] text-white'
+                            : 'bg-[#e2e8f0] text-[#64748b]'
                         }`}
                       >
                         {plan.badge}
                       </span>
                     )}
                     <div>
-                      <p className="text-xs font-medium text-[var(--color-text-dim)]">{plan.name}</p>
-                      <div className="flex items-baseline gap-1 mt-0.5">
-                        <span className="text-xl sm:text-2xl font-bold font-mono text-white">
+                      <p className="text-xs font-bold text-[#1f2430]">{plan.name}</p>
+                      <div className="flex items-baseline gap-1 my-1">
+                        <span className={`text-2xl font-extrabold font-mono ${isSelected ? 'text-[#6c5ce7]' : 'text-[#1f2430]'}`}>
                           {plan.price}
                         </span>
-                        <span className="text-[10px] text-[var(--color-text-faint)]">
+                        <span className="text-[10px] text-[#64748b] font-medium">
                           {plan.period}
                         </span>
                       </div>
                     </div>
-                    <p className="text-[10px] text-[var(--color-text-faint)] mt-2 leading-tight">
+                    <p className="text-[10px] text-[#64748b] mt-1 leading-tight">
                       {plan.billing}
                     </p>
                   </div>
@@ -258,68 +251,57 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
             </div>
 
             {/* FEATURE COMPARISON: 4 FREE VS 10 PRO */}
-            <div className="grid sm:grid-cols-2 gap-4 mb-6">
+            <div className="grid sm:grid-cols-2 gap-4">
               {/* 4 FREE FEATURES */}
-              <div className="p-4 rounded-2xl bg-[#0e131f] border border-[var(--color-line)]">
-                <div className="flex items-center justify-between pb-2 mb-3 border-b border-[var(--color-line)]">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-dim)]">
+              <div className="p-4 rounded-2xl bg-[#f8f6ff] border border-[#e8e4f5]">
+                <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#e8e4f5]">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#64748b]">
                     Free Plan (4 Features)
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#1e293b] text-[var(--color-text-dim)] font-mono">
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-white border border-[#e8e4f5] text-[#64748b] font-mono font-bold">
                     $0 / forever
                   </span>
                 </div>
                 <ul className="space-y-2.5 text-xs">
                   {FREE_FEATURES.map((feat) => (
-                    <li key={feat.id} className="flex items-start gap-2 text-[var(--color-text-dim)]">
-                      <Check size={14} className="text-[var(--color-safe)] mt-0.5 shrink-0" />
+                    <li key={feat.id} className="flex items-start gap-2 text-[#334155]">
+                      <Check size={14} className="text-[#10b981] mt-0.5 shrink-0" />
                       <div>
-                        <p className="font-medium text-[var(--color-text)]">{feat.name}</p>
-                        <p className="text-[11px] text-[var(--color-text-faint)]">{feat.desc}</p>
+                        <p className="font-semibold text-[#1f2430]">{feat.name}</p>
+                        <p className="text-[11px] text-[#64748b]">{feat.desc}</p>
                       </div>
                     </li>
                   ))}
-                  <li className="flex items-start gap-2 text-[var(--color-text-faint)] pt-1 opacity-70">
-                    <X size={14} className="text-[var(--color-over)] mt-0.5 shrink-0" />
+                  <li className="flex items-start gap-2 text-[#94a3b8] pt-1">
+                    <X size={14} className="text-[#ef4444] mt-0.5 shrink-0" />
                     <span>No custom categories, max 5 logs/day, 3-day history</span>
                   </li>
                 </ul>
               </div>
 
               {/* 10 PRO FEATURES */}
-              <div className="p-4 rounded-2xl bg-gradient-to-b from-[#182338] to-[#121a2c] border border-[var(--color-brand)]/40 shadow-md">
-                <div className="flex items-center justify-between pb-2 mb-3 border-b border-[var(--color-brand)]/20">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-brand)] flex items-center gap-1.5">
-                    <Sparkles size={13} />
-                    <span>Pro Member (10 Features)</span>
+              <div className="p-4 rounded-2xl bg-[#f0fdf4] border-2 border-[#bbf7d0] shadow-xs">
+                <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#bbf7d0]">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#16a34a] flex items-center gap-1.5">
+                    <Sparkles size={14} />
+                    <span>Pro Member (10 Superpowers)</span>
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--color-brand)] text-[var(--color-ink)] font-bold font-mono">
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#16a34a] text-white font-bold font-mono">
                     PRO
                   </span>
                 </div>
-                <div className="max-h-56 overflow-y-auto pr-1 space-y-2.5 text-xs">
-                  {PREMIUM_FEATURES.map((feat) => {
-                    const isHighlighted =
-                      highlightFeature && feat.name.toLowerCase().includes(highlightFeature.toLowerCase())
-                    return (
-                      <div
-                        key={feat.id}
-                        className={`flex items-start gap-2 p-1.5 rounded-lg transition-colors ${
-                          isHighlighted ? 'bg-[var(--color-brand)]/20 border border-[var(--color-brand)]/30' : ''
-                        }`}
-                      >
-                        <div className="w-4 h-4 rounded-full bg-[var(--color-brand)]/20 flex items-center justify-center shrink-0 mt-0.5">
-                          <Check size={11} className="text-[var(--color-brand)]" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-white flex items-center gap-1">
-                            <span>{feat.name}</span>
-                          </p>
-                          <p className="text-[11px] text-[var(--color-text-dim)]">{feat.desc}</p>
-                        </div>
+                <div className="max-h-56 overflow-y-auto pr-1 space-y-2 text-xs">
+                  {PREMIUM_FEATURES.map((feat) => (
+                    <div key={feat.id} className="flex items-start gap-2">
+                      <div className="w-4 h-4 rounded-full bg-[#dcfce7] flex items-center justify-center shrink-0 mt-0.5">
+                        <Check size={11} className="text-[#16a34a]" />
                       </div>
-                    )
-                  })}
+                      <div>
+                        <p className="font-bold text-[#1f2430]">{feat.name}</p>
+                        <p className="text-[11px] text-[#64748b] leading-tight">{feat.desc}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -329,18 +311,18 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
               <button
                 type="button"
                 onClick={handleStartCheckout}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-[0.99] transition-all shadow-xl shadow-[var(--color-brand)]/25 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-900 font-bold text-sm hover:brightness-105 active:scale-[0.99] transition-all shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Zap size={18} fill="currentColor" />
                 <span>
                   Pay {currentPlan.price} with Polar.sh ({currentPlan.name})
                 </span>
-                <ExternalLink size={14} className="ml-1 opacity-75" />
+                <ExternalLink size={14} className="ml-1 opacity-80" />
               </button>
 
-              <div className="flex items-center justify-center gap-4 text-[11px] text-[var(--color-text-faint)]">
+              <div className="flex items-center justify-center gap-4 text-[11px] text-[#94a3b8]">
                 <span className="flex items-center gap-1">
-                  <Shield size={12} /> Polar.sh Checkout Protection
+                  <Shield size={12} className="text-[#10b981]" /> Polar.sh Checkout Protection
                 </span>
                 <span>•</span>
                 <span>Cancel anytime</span>
@@ -351,43 +333,45 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
           </div>
         )}
 
-        {/* STEP 2: Secure Polar Card Checkout Sheet */}
+        {/* STEP 2: IN-APP POLAR CARD CHECKOUT */}
         {step === 'checkout' && (
-          <div>
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-[var(--color-line)]">
+          <div className="space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-[#f1edf9]">
               <button
                 type="button"
                 onClick={() => setStep('plans')}
-                className="flex items-center gap-1.5 text-xs text-[var(--color-text-dim)] hover:text-white transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 text-xs font-bold text-[#6c5ce7] hover:opacity-80 cursor-pointer"
               >
                 <ArrowLeft size={16} />
                 <span>Change Plan</span>
               </button>
-              <div className="flex items-center gap-1.5 text-xs text-[var(--color-brand)] font-mono font-semibold">
+              <div className="flex items-center gap-1.5 text-xs text-[#6c5ce7] font-mono font-bold">
                 <Shield size={14} />
                 <span>Polar.sh Secure Checkout</span>
               </div>
             </div>
 
             {/* ORDER SUMMARY */}
-            <div className="p-4 rounded-2xl bg-[#0e131f] border border-[var(--color-brand)]/30 mb-6 flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-[#ede9fe] border border-[#ddd6fe] flex items-center justify-between">
               <div>
-                <p className="text-xs text-[var(--color-text-dim)] uppercase font-mono">Plan Selected</p>
-                <h4 className="text-base font-bold text-white mt-0.5">
+                <p className="text-[10px] text-[#6c5ce7] uppercase font-bold tracking-wider font-mono">
+                  Plan Selected
+                </p>
+                <h4 className="text-sm font-bold text-[#1f2430] mt-0.5">
                   BudgetDaily Pro ({currentPlan.name})
                 </h4>
-                <p className="text-[11px] text-[var(--color-text-faint)]">{currentPlan.billing}</p>
+                <p className="text-[11px] text-[#64748b]">{currentPlan.billing}</p>
               </div>
               <div className="text-right font-mono">
-                <span className="text-2xl font-bold text-[var(--color-brand)]">{currentPlan.price}</span>
-                <span className="text-xs text-[var(--color-text-dim)] block">{currentPlan.period}</span>
+                <span className="text-2xl font-bold text-[#6c5ce7]">{currentPlan.price}</span>
+                <span className="text-xs text-[#64748b] block">{currentPlan.period}</span>
               </div>
             </div>
 
-            {/* PAYMENT CARD FORM */}
+            {/* CARD FORM */}
             <form onSubmit={handleProcessPayment} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-[var(--color-text-dim)] mb-1.5">
+                <label className="block text-xs font-semibold text-[#64748b] mb-1.5">
                   Cardholder Name
                 </label>
                 <input
@@ -396,12 +380,12 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
                   placeholder="e.g. Hamza Magsi"
                   value={cardName}
                   onChange={(e) => setCardName(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-[#0e131f] border border-[var(--color-line)] text-xs text-white outline-none focus:border-[var(--color-brand)] transition-all font-mono"
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#f8f6ff] border border-[#e8e4f5] text-xs text-[#1f2430] outline-none focus:border-[#6c5ce7]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[var(--color-text-dim)] mb-1.5">
+                <label className="block text-xs font-semibold text-[#64748b] mb-1.5">
                   Card Number
                 </label>
                 <div className="relative">
@@ -412,15 +396,15 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
                     placeholder="4242 4242 4242 4242"
                     value={cardNumber}
                     onChange={handleCardNumberChange}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#0e131f] border border-[var(--color-line)] text-xs text-white outline-none focus:border-[var(--color-brand)] transition-all font-mono tracking-wider"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#f8f6ff] border border-[#e8e4f5] text-xs text-[#1f2430] outline-none focus:border-[#6c5ce7] font-mono tracking-wider"
                   />
-                  <CreditCard size={16} className="absolute left-3.5 top-3 text-[var(--color-text-dim)]" />
+                  <CreditCard size={16} className="absolute left-3.5 top-3 text-[#94a3b8]" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-[var(--color-text-dim)] mb-1.5">
+                  <label className="block text-xs font-semibold text-[#64748b] mb-1.5">
                     Expiration (MM/YY)
                   </label>
                   <div className="relative">
@@ -431,14 +415,14 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
                       placeholder="12/28"
                       value={cardExpiry}
                       onChange={handleExpiryChange}
-                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[#0e131f] border border-[var(--color-line)] text-xs text-white outline-none focus:border-[var(--color-brand)] transition-all font-mono"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[#f8f6ff] border border-[#e8e4f5] text-xs text-[#1f2430] outline-none focus:border-[#6c5ce7] font-mono"
                     />
-                    <Calendar size={14} className="absolute left-3 top-3 text-[var(--color-text-dim)]" />
+                    <Calendar size={14} className="absolute left-3 top-3 text-[#94a3b8]" />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-[var(--color-text-dim)] mb-1.5">
+                  <label className="block text-xs font-semibold text-[#64748b] mb-1.5">
                     Security Code (CVC)
                   </label>
                   <div className="relative">
@@ -450,15 +434,15 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
                       placeholder="123"
                       value={cardCvc}
                       onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, ''))}
-                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[#0e131f] border border-[var(--color-line)] text-xs text-white outline-none focus:border-[var(--color-brand)] transition-all font-mono"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[#f8f6ff] border border-[#e8e4f5] text-xs text-[#1f2430] outline-none focus:border-[#6c5ce7] font-mono"
                     />
-                    <Key size={14} className="absolute left-3 top-3 text-[var(--color-text-dim)]" />
+                    <Key size={14} className="absolute left-3 top-3 text-[#94a3b8]" />
                   </div>
                 </div>
               </div>
 
               {error && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400 flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-600 flex items-center gap-2">
                   <AlertCircle size={14} className="shrink-0" />
                   <span>{error}</span>
                 </div>
@@ -467,7 +451,7 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-[0.99] transition-all shadow-xl shadow-[var(--color-brand)]/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-2"
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-900 font-bold text-sm hover:brightness-105 active:scale-[0.99] transition-all shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-2"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
@@ -483,24 +467,24 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
               </button>
             </form>
 
-            <div className="mt-4 pt-4 border-t border-[var(--color-line)] flex items-center justify-center gap-2 text-[11px] text-[var(--color-text-faint)]">
-              <Shield size={13} className="text-[var(--color-safe)]" />
-              <span>Encrypted with 256-bit TLS · Polar Merchant Certified</span>
+            <div className="pt-2 flex items-center justify-center gap-2 text-[11px] text-[#94a3b8]">
+              <Shield size={13} className="text-[#10b981]" />
+              <span>Encrypted with 256-bit TLS · Polar.sh Merchant Certified</span>
             </div>
           </div>
         )}
 
-        {/* STEP 3: Payment Success & Pro Activated Receipt */}
+        {/* STEP 3: SUCCESS CONFIRMATION */}
         {step === 'success' && (
           <div className="py-10 text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-[var(--color-safe)]/20 text-[var(--color-safe)] flex items-center justify-center mx-auto shadow-xl shadow-[var(--color-safe)]/20">
+            <div className="w-16 h-16 rounded-full bg-[#dcfce7] text-[#16a34a] flex items-center justify-center mx-auto shadow-xl shadow-[#16a34a]/20">
               <CheckCircle2 size={36} />
             </div>
-            <h3 className="text-2xl font-bold text-white">Payment Confirmed!</h3>
-            <p className="text-xs sm:text-sm text-[var(--color-text-dim)] max-w-sm mx-auto">
-              You are now an active <strong className="text-amber-400">BudgetDaily Pro Member</strong>. All 10 premium features are immediately unlocked.
+            <h3 className="text-2xl font-extrabold text-[#1f2430]">Payment Confirmed!</h3>
+            <p className="text-xs sm:text-sm text-[#64748b] max-w-sm mx-auto">
+              You are now an active <strong className="text-[#6c5ce7]">BudgetDaily Pro Member</strong>. All 10 premium features are immediately unlocked.
             </p>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-[var(--color-text-dim)]">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#f8f6ff] border border-[#e8e4f5] text-xs font-mono text-[#64748b]">
               <Receipt size={13} />
               <span>Receipt sent to {user?.email || 'your email'}</span>
             </div>
