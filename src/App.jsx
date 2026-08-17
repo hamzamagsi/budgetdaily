@@ -4,6 +4,9 @@ import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Onboarding from './pages/Onboarding'
 import Dashboard from './pages/Dashboard'
+import BudgetManager from './pages/BudgetManager'
+import Analytics from './pages/Analytics'
+import Settings from './pages/Settings'
 import Subscribe from './pages/Subscribe'
 
 function RequireAuth({ children }) {
@@ -34,6 +37,30 @@ export default function App() {
             element={
               <RequireAuth>
                 <Dashboard />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/budgets"
+            element={
+              <RequireAuth>
+                <BudgetManager />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <RequireAuth>
+                <Analytics />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <RequireAuth>
+                <Settings />
               </RequireAuth>
             }
           />

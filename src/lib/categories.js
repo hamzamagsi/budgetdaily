@@ -1,48 +1,42 @@
 // categories.js
-// Predefined rich categories with emoji icons and modern styling
+// Predefined rich categories with Figma emoji icons and modern styling
 
 export const DEFAULT_CATEGORIES = [
-  { id: 'tea', name: 'Tea / Chai', icon: '☕', color: '#f59e0b', isCustom: false },
-  { id: 'coffee', name: 'Coffee & Cafe', icon: '🍵', color: '#d97706', isCustom: false },
-  { id: 'food', name: 'Food & Dining', icon: '🍔', color: '#ef4444', isCustom: false },
-  { id: 'groceries', name: 'Groceries', icon: '🛒', color: '#10b981', isCustom: false },
-  { id: 'transport', name: 'Fuel & Transport', icon: '🚗', color: '#3b82f6', isCustom: false },
-  { id: 'shopping', name: 'Shopping', icon: '🛍️', color: '#ec4899', isCustom: false },
-  { id: 'bills', name: 'Bills & Utilities', icon: '💡', color: '#8b5cf6', isCustom: false },
-  { id: 'entertainment', name: 'Fun & Movies', icon: '🎬', color: '#a855f7', isCustom: false },
-  { id: 'health', name: 'Health & Pharmacy', icon: '💊', color: '#06b6d4', isCustom: false },
-  { id: 'fitness', name: 'Gym & Fitness', icon: '🏋️', color: '#14b8a6', isCustom: false },
-  { id: 'education', name: 'Education & Books', icon: '📚', color: '#6366f1', isCustom: false },
-  { id: 'travel', name: 'Travel & Trips', icon: '✈️', color: '#0ea5e9', isCustom: false },
-  { id: 'gifts', name: 'Gifts & Charity', icon: '🎁', color: '#f43f5e', isCustom: false },
-  { id: 'tech', name: 'Tech & Gadgets', icon: '📱', color: '#64748b', isCustom: false },
-  { id: 'work', name: 'Work & Office', icon: '💼', color: '#78716c', isCustom: false },
-  { id: 'pets', name: 'Pets & Animals', icon: '🐾', color: '#eab308', isCustom: false },
-  { id: 'other', name: 'Other / General', icon: '🏷️', color: '#94a3b8', isCustom: false },
+  { id: 'rent', name: 'Rent', icon: '🏠', color: '#6366f1', budget: 1700, isCustom: false },
+  { id: 'healthcare', name: 'Healthcare', icon: '❤️', color: '#ec4899', budget: 200, isCustom: false },
+  { id: 'dining', name: 'Dining Out', icon: '🍣', color: '#f43f5e', budget: 250, isCustom: false },
+  { id: 'entertainment', name: 'Entertainment', icon: '🍺', color: '#f59e0b', budget: 200, isCustom: false },
+  { id: 'groceries', name: 'Groceries', icon: '🍎', color: '#10b981', budget: 500, isCustom: false },
+  { id: 'tea', name: 'Tea / Chai', icon: '☕', color: '#d97706', budget: 50, isCustom: false },
+  { id: 'coffee', name: 'Coffee & Cafe', icon: '🍵', color: '#059669', budget: 60, isCustom: false },
+  { id: 'transport', name: 'Transport & Fuel', icon: '🚗', color: '#3b82f6', budget: 150, isCustom: false },
+  { id: 'shopping', name: 'Shopping', icon: '🛍️', color: '#8b5cf6', budget: 150, isCustom: false },
+  { id: 'bills', name: 'Bills & Utilities', icon: '💡', color: '#06b6d4', budget: 100, isCustom: false },
+  { id: 'other', name: 'Other / General', icon: '🏷️', color: '#94a3b8', budget: 90, isCustom: false },
 ]
 
-export const QUICK_PRESETS = [
-  { label: 'Tea / Chai', amount: 1.5, categoryId: 'tea', icon: '☕' },
-  { label: 'Coffee', amount: 3.5, categoryId: 'coffee', icon: '🍵' },
-  { label: 'Snack / Lunch', amount: 8.0, categoryId: 'food', icon: '🍔' },
-  { label: 'Fuel / Ride', amount: 5.0, categoryId: 'transport', icon: '🚗' },
-  { label: 'Groceries', amount: 15.0, categoryId: 'groceries', icon: '🛒' },
+export const INCOME_CATEGORIES = [
+  { id: 'salary', name: 'Salary', icon: '💼', color: '#22c55e' },
+  { id: 'freelance', name: 'Freelance', icon: '💻', color: '#10b981' },
+  { id: 'investments', name: 'Investments / Dividends', icon: '📈', color: '#3b82f6' },
+  { id: 'gift_income', name: 'Gifts & Bonus', icon: '🎁', color: '#f59e0b' },
+  { id: 'other_income', name: 'Other Income', icon: '💵', color: '#8b5cf6' },
 ]
 
 export const EMOJI_PICKER_OPTIONS = [
-  '☕', '🍵', '🍔', '🍕', '🌮', '🍜', '🍩', '🛒', '🚗', '⛽', '🚕', '🚌',
-  '🛍️', '👕', '👟', '💡', '⚡', '💧', '🎬', '🎮', '🎵', '🎟️', '💊', '🏥',
-  '🏋️', '⚽', '🎾', '📚', '🎓', '✈️', '🏨', '🏖️', '🎁', '💐', '📱', '💻',
-  '💼', '🪙', '💳', '🐾', '🐶', '🐱', '👶', '🪴', '✂️', '🧹', '🛠️', '🏷️'
+  '🏠', '❤️', '🍣', '🍺', '🍎', '☕', '🍵', '🍔', '🍕', '🌮', '🍜', '🍩',
+  '🛒', '🚗', '⛽', '🚕', '🚌', '🛍️', '💡', '🎬', '🎮', '🎵', '💊', '🏥',
+  '🏋️', '📚', '✈️', '🎁', '📱', '💼', '🪙', '💳', '💵', '🐾', '🪴', '🏷️'
 ]
 
 export const COLOR_OPTIONS = [
-  '#f59e0b', '#ef4444', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6',
-  '#06b6d4', '#14b8a6', '#6366f1', '#0ea5e9', '#f43f5e', '#64748b'
+  '#6366f1', '#ec4899', '#f43f5e', '#f59e0b', '#10b981', '#3b82f6',
+  '#8b5cf6', '#06b6d4', '#d97706', '#059669', '#22c55e', '#64748b'
 ]
 
 export function getCategoryById(categories, id) {
-  return categories.find((c) => c.id === id) || {
+  const all = [...(categories || DEFAULT_CATEGORIES), ...INCOME_CATEGORIES]
+  return all.find((c) => c.id === id) || {
     id: 'other',
     name: 'General',
     icon: '🏷️',

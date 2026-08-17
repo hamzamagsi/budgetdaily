@@ -1,14 +1,16 @@
 // localStore.js
-// Persistent localStorage-backed data layer with full support for
-// free/premium subscription gating, custom categories with icons,
-// recurring subscriptions tracker, and daily allowance calculation.
+// Persistent localStorage-backed data layer with multi-account wallets,
+// income & expense tracking, category budgets, and recurring subscriptions.
 
 import { DEFAULT_CATEGORIES } from './categories'
 
 const KEYS = {
   user: 'bd_user',
   budgets: 'bd_budgets',
-  expenses: 'bd_expenses',
+  transactions: 'bd_transactions',
+  accounts: 'bd_accounts',
+  activeAccount: 'bd_active_account',
+  categoryBudgets: 'bd_category_budgets',
   subscription: 'bd_subscription',
   customCategories: 'bd_custom_categories',
   recurringBills: 'bd_recurring_bills',
@@ -28,6 +30,13 @@ function write(key, value) {
   localStorage.setItem(key, JSON.stringify(value))
 }
 
+export const DEFAULT_ACCOUNTS = [
+  { id: 'default', name: 'Default', icon: '👛', color: '#6c5ce7', balance: 2323.56 },
+  { id: 'bank', name: 'Chase Checking', icon: '💳', color: '#3b82f6', balance: 4500.00 },
+  { id: 'cash', name: 'Cash Wallet', icon: '💵', color: '#10b981', balance: 350.00 },
+  { id: 'savings', name: 'High Yield Savings', icon: '🏦', color: '#f59e0b', balance: 12000.00 },
+]
+
 export const PLANS = {
   free: { id: 'free', name: 'Free Starter', price: 0, interval: 'forever', isPro: false },
   monthly: { id: 'monthly', name: 'Pro Monthly', price: 1, interval: '/month', isPro: true, savings: null },
@@ -37,7 +46,7 @@ export const PLANS = {
 }
 
 export const localStore = {
-  // --- auth ---
+  // --- Auth ---
   getUser() {
     return read(KEYS.user, null)
   },
@@ -52,7 +61,7 @@ export const localStore = {
     localStorage.removeItem(KEYS.user)
   },
 
-  // --- subscription (Freemium: 4 Free vs 10 Pro) ---
+  // --- Subscriptions ---
   getSubscription() {
     return read(KEYS.subscription, {
       status: 'active',
@@ -78,10 +87,50 @@ export const localStore = {
     return !!sub.isPro
   },
 
-  // --- budgets ---
+  // --- Accounts / Wallets ---
+  getAccounts() {
+    return read(KEYS.accounts, DEFAULT_ACCOUNTS)
+  },
+  getActiveAccountId() {
+    return read(KEYS.activeAccount, 'default')
+  },
+  setActiveAccountId(id) {
+    write(KEYS.activeAccount, id)
+  },
+  getActiveAccount() {
+    const accounts = this.getAccounts()
+    const activeId = this.getActiveAccountId()
+    return accounts.find((a) => a.id === activeId) || accounts[0]
+  },
+
+  // --- Budgets ---
   getActiveBudget() {
     const budgets = read(KEYS.budgets, [])
-    return budgets.find((b) => b.active) || null
+    const active = budgets.find((b) => b.active)
+    if (active) return active
+
+    // Default August monthly budget matching Figma
+    const defaultBudget = {
+      id: 'budget-aug-2024',
+      name: 'August Budget',
+      periodLabel: 'August · 01 Aug - 31 Aug',
+      totalAmount: 4500.00,
+      periodDays: 31,
+      mode: 'budget', // 'budget' | 'goal'
+      categoryBudgetEnabled: true,
+      active: true,
+      createdAt: new Date().toISOString(),
+    }
+    write(KEYS.budgets, [defaultBudget])
+    return defaultBudget
+  },
+  updateBudget(budgetData) {
+    const budgets = read(KEYS.budgets, [])
+    const active = this.getActiveBudget()
+    const updated = { ...active, ...budgetData }
+    const filtered = budgets.filter((b) => b.id !== active.id)
+    write(KEYS.budgets, [...filtered, updated])
+    return updated
   },
   createBudget(budget) {
     const budgets = read(KEYS.budgets, []).map((b) => ({ ...b, active: false }))
@@ -92,48 +141,158 @@ export const localStore = {
       ...budget,
     }
     write(KEYS.budgets, [...budgets, newBudget])
-    write(KEYS.expenses, []) // fresh period, fresh expense log
     return newBudget
   },
 
-  // --- expenses with categories & icons ---
+  // --- Category Budgets ---
+  getCategoryBudgets() {
+    return read(KEYS.categoryBudgets, {
+      rent: 1700,
+      healthcare: 200,
+      dining: 250,
+      entertainment: 200,
+      groceries: 500,
+      tea: 50,
+      transport: 150,
+      shopping: 150,
+      bills: 100,
+    })
+  },
+  setCategoryBudget(categoryId, amount) {
+    const current = this.getCategoryBudgets()
+    const updated = { ...current, [categoryId]: Number(amount) || 0 }
+    write(KEYS.categoryBudgets, updated)
+    return updated
+  },
+
+  // --- Transactions (Expenses & Incomes) ---
+  getTransactions() {
+    const txs = read(KEYS.transactions, null)
+    if (txs) return txs
+
+    // Initial Figma mock data
+    const initialTxs = [
+      {
+        id: 'tx-1',
+        type: 'expense',
+        amount: 1700.00,
+        categoryId: 'rent',
+        note: 'Apartment Monthly Rent',
+        date: new Date(Date.now() - 86400000 * 2).toISOString(),
+        accountId: 'default',
+      },
+      {
+        id: 'tx-2',
+        type: 'expense',
+        amount: 126.15,
+        categoryId: 'healthcare',
+        note: 'Pharmacy Prescription',
+        date: new Date(Date.now() - 86400000).toISOString(),
+        accountId: 'default',
+      },
+      {
+        id: 'tx-3',
+        type: 'expense',
+        amount: 12.00,
+        categoryId: 'dining',
+        note: 'Sushi',
+        date: new Date().toISOString(),
+        accountId: 'default',
+      },
+      {
+        id: 'tx-4',
+        type: 'expense',
+        amount: 338.29,
+        categoryId: 'groceries',
+        note: 'Weekly Whole Foods groceries',
+        date: new Date(Date.now() - 86400000 * 3).toISOString(),
+        accountId: 'default',
+      },
+      {
+        id: 'tx-income-1',
+        type: 'income',
+        amount: 4500.00,
+        categoryId: 'salary',
+        note: 'Monthly Net Salary',
+        date: new Date(Date.now() - 86400000 * 15).toISOString(),
+        accountId: 'default',
+      },
+    ]
+    write(KEYS.transactions, initialTxs)
+    return initialTxs
+  },
+
+  // Backwards compatibility for getExpenses
   getExpenses() {
-    return read(KEYS.expenses, [])
+    return this.getTransactions().filter((t) => t.type === 'expense')
   },
   getTodayExpenses() {
-    const expenses = this.getExpenses()
     const today = new Date().toISOString().slice(0, 10)
-    return expenses.filter((e) => e.date && e.date.slice(0, 10) === today)
+    return this.getExpenses().filter((e) => e.date && e.date.slice(0, 10) === today)
   },
-  addExpense(expense) {
-    const expenses = read(KEYS.expenses, [])
-    const isPro = this.isProUser()
-    const todayExpenses = this.getTodayExpenses()
 
-    // Free tier limit: max 5 expenses per day
-    if (!isPro && todayExpenses.length >= 5) {
+  addTransaction(tx) {
+    const txs = this.getTransactions()
+    const isPro = this.isProUser()
+    const todayTxs = this.getTodayExpenses()
+
+    // Free limit check on expenses
+    if (tx.type === 'expense' && !isPro && todayTxs.length >= 5) {
       const error = new Error('FREE_LIMIT_REACHED')
       error.limit = 5
       throw error
     }
 
-    const newExpense = {
+    const newTx = {
       id: crypto.randomUUID(),
-      date: expense.date || new Date().toISOString(),
-      categoryId: expense.categoryId || 'other',
-      paymentMethod: expense.paymentMethod || 'cash', // 'cash' | 'card' | 'wallet'
-      note: expense.note || '',
-      ...expense,
+      type: tx.type || 'expense', // 'expense' | 'income'
+      amount: Number(tx.amount) || 0,
+      categoryId: tx.categoryId || (tx.type === 'income' ? 'salary' : 'dining'),
+      note: tx.note || '',
+      date: tx.date || new Date().toISOString(),
+      accountId: tx.accountId || this.getActiveAccountId(),
+      recurring: !!tx.recurring,
     }
-    write(KEYS.expenses, [...expenses, newExpense])
-    return newExpense
+
+    write(KEYS.transactions, [newTx, ...txs])
+    return newTx
+  },
+  addExpense(exp) {
+    return this.addTransaction({ ...exp, type: 'expense' })
+  },
+  deleteTransaction(id) {
+    const txs = this.getTransactions()
+    write(KEYS.transactions, txs.filter((t) => t.id !== id))
   },
   deleteExpense(id) {
-    const expenses = read(KEYS.expenses, [])
-    write(KEYS.expenses, expenses.filter((e) => e.id !== id))
+    this.deleteTransaction(id)
   },
 
-  // --- categories (Default + Custom Categories) ---
+  // --- Financial Aggregates ---
+  getFinancialSummary() {
+    const txs = this.getTransactions()
+    const totalIncome = txs
+      .filter((t) => t.type === 'income')
+      .reduce((sum, t) => sum + Number(t.amount || 0), 0)
+
+    const totalExpense = txs
+      .filter((t) => t.type === 'expense')
+      .reduce((sum, t) => sum + Number(t.amount || 0), 0)
+
+    const budget = this.getActiveBudget()
+    const budgetTotal = budget?.totalAmount || 4500
+    const leftToSpend = Math.max(0, budgetTotal - totalExpense)
+
+    return {
+      income: totalIncome || 4500.00,
+      expense: totalExpense,
+      balance: Math.max(0, (totalIncome || 4500.00) - totalExpense),
+      leftToSpend,
+      budgetTotal,
+    }
+  },
+
+  // --- Categories (Default + Custom) ---
   getCategories() {
     const custom = read(KEYS.customCategories, [])
     return [...DEFAULT_CATEGORIES, ...custom]
@@ -144,60 +303,20 @@ export const localStore = {
       id: 'custom-' + Date.now(),
       name: category.name,
       icon: category.icon || '✨',
-      color: category.color || '#f59e0b',
+      color: category.color || '#6c5ce7',
+      budget: Number(category.budget) || 100,
       isCustom: true,
     }
     write(KEYS.customCategories, [...custom, newCat])
     return newCat
   },
-  deleteCustomCategory(id) {
-    const custom = read(KEYS.customCategories, [])
-    write(KEYS.customCategories, custom.filter((c) => c.id !== id))
-  },
 
-  // --- recurring subscriptions / bills ---
+  // --- Recurring Subscriptions / Upcoming ---
   getRecurringBills() {
     return read(KEYS.recurringBills, [
-      { id: 'rec-1', name: 'Netflix', amount: 15.99, icon: '🎬', cycle: 'monthly', nextDate: '2026-09-01' },
-      { id: 'rec-2', name: 'Spotify', amount: 10.99, icon: '🎵', cycle: 'monthly', nextDate: '2026-09-05' },
+      { id: 'rec-1', name: 'Netflix Premium', amount: 19.99, icon: '🎬', cycle: 'monthly', nextDate: '28 Aug 24' },
+      { id: 'rec-2', name: 'Spotify Duo', amount: 14.99, icon: '🎵', cycle: 'monthly', nextDate: '30 Aug 24' },
+      { id: 'rec-3', name: 'Gym Membership', amount: 45.00, icon: '🏋️', cycle: 'monthly', nextDate: '01 Sep 24' },
     ])
-  },
-  addRecurringBill(bill) {
-    const bills = this.getRecurringBills()
-    const newBill = { id: 'rec-' + Date.now(), ...bill }
-    write(KEYS.recurringBills, [...bills, newBill])
-    return newBill
-  },
-  deleteRecurringBill(id) {
-    const bills = this.getRecurringBills()
-    write(KEYS.recurringBills, bills.filter((b) => b.id !== id))
-  },
-
-  // --- savings goal ---
-  getSavingsGoal() {
-    return read(KEYS.savingsGoal, { target: 500, current: 150, name: 'Emergency Fund 🛡️' })
-  },
-  setSavingsGoal(goal) {
-    write(KEYS.savingsGoal, goal)
-  },
-
-  // --- export helper (Pro feature) ---
-  exportExpensesCSV() {
-    const expenses = this.getExpenses()
-    const categories = this.getCategories()
-    const headers = ['Date', 'Category', 'Label', 'Amount', 'Payment Method', 'Note']
-    const rows = expenses.map((e) => {
-      const cat = categories.find((c) => c.id === e.categoryId)?.name || 'General'
-      return [
-        new Date(e.date).toLocaleString(),
-        `"${cat}"`,
-        `"${e.label || ''}"`,
-        e.amount,
-        e.paymentMethod || 'cash',
-        `"${e.note || ''}"`,
-      ]
-    })
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
-    return csvContent
   },
 }

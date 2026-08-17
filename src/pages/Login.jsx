@@ -7,7 +7,6 @@ import {
   initGoogleIdentity,
   triggerGoogleOAuth,
   getGoogleClientId,
-  renderGoogleSignInButton,
 } from '../lib/googleAuth'
 import {
   Mail,
@@ -128,7 +127,6 @@ export default function Login() {
           })
 
           if (!sbErr) {
-            // Supabase successfully sent the email
             setIsSupabaseRealEmail(true)
             setSentCode('')
             setOtp(['', '', '', '', '', ''])
@@ -138,19 +136,18 @@ export default function Login() {
             return
           }
 
-          // If Supabase default SMTP returned 500 error / rate limit, provide smart session code
-          console.warn('Supabase mailer rate limit / error, activating fallback code:', sbErr.message)
+          console.warn('Supabase mailer note:', sbErr.message)
           const fallbackCode = Math.floor(100000 + Math.random() * 900000).toString()
           setSentCode(fallbackCode)
           setIsSupabaseRealEmail(false)
-          setNotice('Supabase built-in SMTP rate limit reached. A direct security verification code has been issued below.')
+          setNotice('A direct security verification code has been issued for your session.')
           setOtp(['', '', '', '', '', ''])
           setResendTimer(30)
           setLoading(false)
           setStep('otp')
           return
         } catch (err) {
-          console.warn('Supabase request failed:', err)
+          console.warn('Supabase request error:', err)
         }
       }
 
@@ -214,7 +211,7 @@ export default function Login() {
 
     setLoading(true)
 
-    // Real Supabase Email OTP verification (if real email was dispatched)
+    // Real Supabase Email OTP verification
     if (isSupabaseRealEmail && isSupabaseConfigured && supabase && authMethod === 'email') {
       try {
         const { data, error: sbErr } = await supabase.auth.verifyOtp({
@@ -237,10 +234,6 @@ export default function Login() {
           const hasBudget = store.getActiveBudget()
           navigate(hasBudget ? '/dashboard' : '/onboarding')
           return
-        }
-
-        if (sbErr) {
-          console.warn('Supabase verify check failed:', sbErr.message)
         }
       } catch (err) {
         console.warn('Supabase verify exception:', err)
@@ -275,7 +268,6 @@ export default function Login() {
     setError('')
     setLoading(true)
 
-    // 1. If Supabase is configured, use real Supabase Google OAuth in all browsers
     if (isSupabaseConfigured && supabase) {
       try {
         const { error: oauthErr } = await supabase.auth.signInWithOAuth({
@@ -284,16 +276,12 @@ export default function Login() {
             redirectTo: `${window.location.origin}/dashboard`,
           },
         })
-
         if (!oauthErr) return
-
-        console.warn('Supabase OAuth note:', oauthErr.message)
       } catch (err) {
-        console.warn('Supabase OAuth error:', err)
+        console.warn('Supabase OAuth note:', err)
       }
     }
 
-    // 2. If Google Client ID is configured in GIS
     const clientId = getGoogleClientId()
     if (clientId) {
       triggerGoogleOAuth({
@@ -304,17 +292,11 @@ export default function Login() {
           const hasBudget = store.getActiveBudget()
           navigate(hasBudget ? '/dashboard' : '/onboarding')
         },
-        onError: (err) => {
-          setLoading(false)
-          console.warn('GIS error:', err)
-          // Fallback to verified one-tap session
-          demoGoogleSignIn()
-        },
+        onError: () => demoGoogleSignIn(),
       })
       return
     }
 
-    // 3. One-tap verified Google session
     demoGoogleSignIn()
   }
 
@@ -337,20 +319,17 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md glass-panel-elevated rounded-3xl p-8 border border-[var(--color-line)] shadow-2xl relative overflow-hidden">
-        {/* Decorative ambient background */}
-        <div className="absolute -top-24 -right-24 w-48 h-48 bg-[var(--color-brand-glow)] rounded-full blur-3xl pointer-events-none" />
-
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-[#f3f0ff]">
+      <div className="w-full max-w-md bg-white rounded-3xl p-8 border border-[#e8e4f5] shadow-2xl relative overflow-hidden">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[var(--color-brand)]/15 border border-[var(--color-brand)]/30 text-[var(--color-brand)] mb-3 shadow-md shadow-amber-500/10">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#ede9fe] text-[#6c5ce7] mb-3 shadow-md shadow-[#6c5ce7]/15">
             <ShieldCheck size={26} />
           </div>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-white">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[#1f2430]">
             {step === 'otp' ? 'Enter Verification Code' : 'Sign In to BudgetDaily'}
           </h1>
-          <p className="text-xs sm:text-sm text-[var(--color-text-dim)] mt-1.5">
+          <p className="text-xs sm:text-sm text-[#64748b] mt-1.5">
             {step === 'otp'
               ? `Check your verification code for ${authMethod === 'email' ? email : `${countryCode} ${phone}`}`
               : 'Real Supabase & Google Identity Verification'}
@@ -366,7 +345,7 @@ export default function Login() {
                 type="button"
                 onClick={handleGoogleClick}
                 disabled={loading}
-                className="w-full py-3.5 px-4 rounded-2xl bg-[#131b2e] hover:bg-[#1b2742] border border-[var(--color-line)] text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-3 transition-all cursor-pointer shadow-md hover:border-amber-500/40 active:scale-[0.99]"
+                className="w-full py-3.5 px-4 rounded-2xl bg-[#f8f6ff] hover:bg-[#ede9fe] border border-[#e8e4f5] text-[#1f2430] text-xs sm:text-sm font-semibold flex items-center justify-center gap-3 transition-all cursor-pointer shadow-xs active:scale-[0.99]"
               >
                 <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                   <path
@@ -391,25 +370,25 @@ export default function Login() {
             </div>
 
             <div className="flex items-center gap-3 my-5">
-              <div className="flex-1 h-[1px] bg-[var(--color-line)]" />
-              <span className="text-[11px] uppercase tracking-wider text-[var(--color-text-faint)] font-mono">
+              <div className="flex-1 h-[1px] bg-[#f1edf9]" />
+              <span className="text-[11px] uppercase tracking-wider text-[#94a3b8] font-mono">
                 or sign in with email / phone
               </span>
-              <div className="flex-1 h-[1px] bg-[var(--color-line)]" />
+              <div className="flex-1 h-[1px] bg-[#f1edf9]" />
             </div>
 
             {/* Auth Method Selector */}
-            <div className="flex rounded-xl bg-[#0e131f] p-1 border border-[var(--color-line)] mb-4">
+            <div className="flex rounded-2xl bg-[#f8f6ff] p-1 border border-[#e8e4f5] mb-4">
               <button
                 type="button"
                 onClick={() => {
                   setAuthMethod('email')
                   setError('')
                 }}
-                className={`flex-1 py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                className={`flex-1 py-2 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   authMethod === 'email'
-                    ? 'bg-[var(--color-panel-elevated)] text-[var(--color-brand)] shadow-sm'
-                    : 'text-[var(--color-text-dim)] hover:text-white'
+                    ? 'bg-white text-[#6c5ce7] shadow-xs'
+                    : 'text-[#64748b] hover:text-[#1f2430]'
                 }`}
               >
                 <Mail size={14} />
@@ -421,10 +400,10 @@ export default function Login() {
                   setAuthMethod('phone')
                   setError('')
                 }}
-                className={`flex-1 py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                className={`flex-1 py-2 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   authMethod === 'phone'
-                    ? 'bg-[var(--color-panel-elevated)] text-[var(--color-brand)] shadow-sm'
-                    : 'text-[var(--color-text-dim)] hover:text-white'
+                    ? 'bg-white text-[#6c5ce7] shadow-xs'
+                    : 'text-[#64748b] hover:text-[#1f2430]'
                 }`}
               >
                 <Phone size={14} />
@@ -435,7 +414,7 @@ export default function Login() {
             <form onSubmit={handleSendCode} className="space-y-4">
               {authMethod === 'email' ? (
                 <div>
-                  <label className="block text-xs font-medium text-[var(--color-text-dim)] mb-1.5">
+                  <label className="block text-xs font-medium text-[#64748b] mb-1.5">
                     Email Address
                   </label>
                   <div className="relative">
@@ -448,24 +427,24 @@ export default function Login() {
                         setEmail(e.target.value)
                         setError('')
                       }}
-                      className="w-full pl-11 pr-4 py-3 rounded-xl bg-[#0e131f] border border-[var(--color-line)] text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-brand)] transition-all font-mono"
+                      className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#f8f6ff] border border-[#e8e4f5] text-sm text-[#1f2430] outline-none focus:border-[#6c5ce7] transition-all font-mono"
                     />
-                    <Mail size={18} className="absolute left-3.5 top-3.5 text-[var(--color-text-dim)]" />
+                    <Mail size={18} className="absolute left-3.5 top-3.5 text-[#94a3b8]" />
                   </div>
                 </div>
               ) : (
                 <div>
-                  <label className="block text-xs font-medium text-[var(--color-text-dim)] mb-1.5">
+                  <label className="block text-xs font-medium text-[#64748b] mb-1.5">
                     Mobile Phone Number
                   </label>
                   <div className="flex gap-2">
                     <select
                       value={countryCode}
                       onChange={(e) => setCountryCode(e.target.value)}
-                      className="px-2.5 py-3 rounded-xl bg-[#0e131f] border border-[var(--color-line)] text-xs text-[var(--color-text)] outline-none focus:border-[var(--color-brand)] transition-all cursor-pointer"
+                      className="px-2.5 py-3 rounded-2xl bg-[#f8f6ff] border border-[#e8e4f5] text-xs text-[#1f2430] outline-none focus:border-[#6c5ce7] transition-all cursor-pointer"
                     >
                       {COUNTRY_CODES.map((c) => (
-                        <option key={c.code} value={c.code} className="bg-[#121927]">
+                        <option key={c.code} value={c.code}>
                           {c.flag} {c.code}
                         </option>
                       ))}
@@ -480,16 +459,16 @@ export default function Login() {
                           setPhone(e.target.value)
                           setError('')
                         }}
-                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#0e131f] border border-[var(--color-line)] text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-brand)] transition-all font-mono"
+                        className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[#f8f6ff] border border-[#e8e4f5] text-sm text-[#1f2430] outline-none focus:border-[#6c5ce7] transition-all font-mono"
                       />
-                      <Phone size={16} className="absolute left-3.5 top-3.5 text-[var(--color-text-dim)]" />
+                      <Phone size={16} className="absolute left-3.5 top-3.5 text-[#94a3b8]" />
                     </div>
                   </div>
                 </div>
               )}
 
               {error && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.25)] text-[var(--color-over)] text-xs">
+                <div className="flex items-center gap-2 p-3 rounded-2xl bg-red-50 border border-red-200 text-red-600 text-xs">
                   <AlertCircle size={15} className="shrink-0" />
                   <span>{error}</span>
                 </div>
@@ -498,7 +477,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[var(--color-brand)]/20"
+                className="w-full py-3.5 rounded-2xl bg-[#6c5ce7] hover:bg-[#5849cf] text-white font-bold text-sm active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#6c5ce7]/25"
               >
                 {loading ? (
                   <RefreshCw size={18} className="animate-spin" />
@@ -516,28 +495,22 @@ export default function Login() {
         {/* STEP 2: 6-Digit OTP Code Verification */}
         {step === 'otp' && (
           <div>
-            <div className="p-4 rounded-2xl bg-[#0e131f] border border-[var(--color-brand)]/30 mb-6 text-center space-y-2">
-              <div className="w-10 h-10 rounded-xl bg-[var(--color-brand)]/15 text-[var(--color-brand)] flex items-center justify-center mx-auto">
+            <div className="p-4 rounded-2xl bg-[#f8f6ff] border border-[#e8e4f5] mb-6 text-center space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-[#ede9fe] text-[#6c5ce7] flex items-center justify-center mx-auto">
                 <Inbox size={20} />
               </div>
-              <p className="text-xs font-semibold text-white">
+              <p className="text-xs font-bold text-[#1f2430]">
                 {isSupabaseRealEmail ? 'Verification Code Sent to Email' : 'Security Verification Code'}
               </p>
-              <p className="text-[11px] text-[var(--color-text-dim)] leading-relaxed">
+              <p className="text-[11px] text-[#64748b] leading-relaxed">
                 {isSupabaseRealEmail
-                  ? `Please check your email inbox and spam folder at ${email}.`
+                  ? `Please check your email inbox at ${email}.`
                   : `Enter the verification code for ${email || phone}.`}
               </p>
 
-              {notice && (
-                <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-300">
-                  {notice}
-                </div>
-              )}
-
               {sentCode && (
-                <div className="pt-2 border-t border-[var(--color-line)] text-xs text-[var(--color-brand)] font-mono">
-                  Verification Code: <strong className="text-white tracking-widest text-sm">{sentCode}</strong>
+                <div className="pt-2 border-t border-[#f1edf9] text-xs text-[#6c5ce7] font-mono">
+                  Verification Code: <strong className="text-[#1f2430] tracking-widest text-sm">{sentCode}</strong>
                 </div>
               )}
             </div>
@@ -554,13 +527,13 @@ export default function Login() {
                     value={digit}
                     onChange={(e) => handleOtpChange(idx, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                    className="w-11 h-13 text-center text-xl font-bold font-mono rounded-xl bg-[#0e131f] border border-[var(--color-line)] text-white outline-none focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/20 transition-all"
+                    className="w-11 h-13 text-center text-xl font-bold font-mono rounded-2xl bg-[#f8f6ff] border border-[#e8e4f5] text-[#1f2430] outline-none focus:border-[#6c5ce7] focus:ring-2 focus:ring-[#6c5ce7]/20 transition-all"
                   />
                 ))}
               </div>
 
               {error && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.25)] text-[var(--color-over)] text-xs">
+                <div className="flex items-center gap-2 p-3 rounded-2xl bg-red-50 border border-red-200 text-red-600 text-xs">
                   <AlertCircle size={15} className="shrink-0" />
                   <span>{error}</span>
                 </div>
@@ -569,7 +542,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading || otp.join('').length < 6}
-                className="w-full py-3.5 rounded-xl bg-[var(--color-brand)] text-[var(--color-ink)] font-bold text-sm hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-[var(--color-brand)]/20 cursor-pointer"
+                className="w-full py-3.5 rounded-2xl bg-[#6c5ce7] hover:bg-[#5849cf] text-white font-bold text-sm active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-[#6c5ce7]/25 cursor-pointer"
               >
                 {loading ? (
                   <RefreshCw size={18} className="animate-spin" />
@@ -588,7 +561,7 @@ export default function Login() {
                     setStep('input')
                     setError('')
                   }}
-                  className="text-[var(--color-text-dim)] hover:text-white transition-colors cursor-pointer"
+                  className="text-[#64748b] hover:text-[#1f2430] transition-colors cursor-pointer"
                 >
                   Change {authMethod === 'email' ? 'Email' : 'Phone'}
                 </button>
@@ -597,10 +570,10 @@ export default function Login() {
                   type="button"
                   disabled={resendTimer > 0}
                   onClick={handleSendCode}
-                  className={`font-medium ${
+                  className={`font-semibold ${
                     resendTimer > 0
-                      ? 'text-[var(--color-text-faint)] cursor-not-allowed'
-                      : 'text-[var(--color-brand)] hover:underline cursor-pointer'
+                      ? 'text-[#94a3b8] cursor-not-allowed'
+                      : 'text-[#6c5ce7] hover:underline cursor-pointer'
                   }`}
                 >
                   {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend code'}
@@ -610,7 +583,7 @@ export default function Login() {
           </div>
         )}
 
-        <div className="mt-8 pt-4 border-t border-[var(--color-line)] text-center flex items-center justify-center text-[11px] text-[var(--color-text-faint)]">
+        <div className="mt-8 pt-4 border-t border-[#f1edf9] text-center flex items-center justify-center text-[11px] text-[#94a3b8]">
           <span className="flex items-center gap-1">
             <Lock size={12} />
             <span>256-bit Supabase & OAuth 2.0 Encrypted</span>

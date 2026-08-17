@@ -1,381 +1,307 @@
-import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { store } from '../lib/store'
-import { computeBudgetStatus } from '../lib/budgetEngine'
+import { useState, useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import AllowanceGauge from '../components/AllowanceGauge'
-import AddExpenseModal from '../components/AddExpenseModal'
-import CustomCategoryModal from '../components/CustomCategoryModal'
-import ExpenseLog from '../components/ExpenseLog'
-import AnalyticsView from '../components/AnalyticsView'
-import SubscriptionsTracker from '../components/SubscriptionsTracker'
-import PremiumModal from '../components/PremiumModal'
+import { store } from '../lib/store'
+import { getCategoryById } from '../lib/categories'
 import Navbar from '../components/Navbar'
-import confetti from 'canvas-confetti'
+import BottomNav from '../components/BottomNav'
+import AddTransactionModal from '../components/AddTransactionModal'
+import PremiumModal from '../components/PremiumModal'
 import {
-  Compass,
-  PieChart,
   Calendar,
-  History,
-  Plus,
-  Crown,
-  Sparkles,
-  ArrowRight,
+  Wallet,
+  TrendingDown,
   TrendingUp,
-  AlertCircle,
+  Receipt,
+  ChevronRight,
+  Plus,
+  ArrowRight,
   CheckCircle2,
+  AlertCircle,
+  MoreVertical,
+  Layers,
+  Sparkles,
 } from 'lucide-react'
 
 export default function Dashboard() {
+  const { user, isPro } = useAuth()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const { user, signOut, isPro, upgradePlan } = useAuth()
 
-  const [budget, setBudget] = useState(null)
-  const [expenses, setExpenses] = useState([])
-  const [categories, setCategories] = useState([])
-  const [activeTab, setActiveTab] = useState('today') // 'today' | 'analytics' | 'subscriptions' | 'history'
+  const [summary, setSummary] = useState({
+    income: 4500,
+    expense: 2176.44,
+    balance: 2323.56,
+    leftToSpend: 2323.56,
+    budgetTotal: 4500,
+  })
+  const [transactions, setTransactions] = useState([])
+  const [categoryBudgets, setCategoryBudgets] = useState({})
+  const [activeAccount, setActiveAccount] = useState(store.getActiveAccount())
 
-  // Modals
-  const [addExpenseOpen, setAddExpenseOpen] = useState(false)
-  const [customCategoryOpen, setCustomCategoryOpen] = useState(false)
-  const [premiumModalOpen, setPremiumModalOpen] = useState(false)
-  const [premiumHighlight, setPremiumHighlight] = useState('')
-  const [limitAlert, setLimitAlert] = useState(false)
-  const [proSuccessToast, setProSuccessToast] = useState(false)
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false)
+  const [highlightFeature, setHighlightFeature] = useState('')
+  const [showUpcoming, setShowUpcoming] = useState(false)
 
-  const refresh = () => {
-    const b = store.getActiveBudget()
-    if (!b) {
-      navigate('/onboarding')
-      return
-    }
-    setBudget(b)
-    setExpenses(store.getExpenses())
-    setCategories(store.getCategories())
+  // Load Financial Data
+  const refreshData = () => {
+    setSummary(store.getFinancialSummary())
+    setTransactions(store.getTransactions())
+    setCategoryBudgets(store.getCategoryBudgets())
+    setActiveAccount(store.getActiveAccount())
   }
 
   useEffect(() => {
-    refresh()
+    refreshData()
+    const handleStorageChange = () => refreshData()
+    window.addEventListener('storage_change', handleStorageChange)
+    return () => window.removeEventListener('storage_change', handleStorageChange)
+  }, [])
 
-    // Handle return from Polar.sh Checkout
-    if (searchParams.get('checkout') === 'success') {
-      const plan = searchParams.get('plan') || 'monthly'
-      upgradePlan(plan)
-      setProSuccessToast(true)
-      try {
-        confetti({
-          particleCount: 120,
-          spread: 80,
-          origin: { y: 0.6 },
-          colors: ['#f59e0b', '#10b981', '#6366f1', '#ec4899'],
-        })
-      } catch (e) {}
+  const categories = store.getCategories()
+  const recurringBills = store.getRecurringBills()
 
-      // Clean search params from URL
-      setSearchParams({})
-      setTimeout(() => setProSuccessToast(false), 5000)
-    }
-  }, [searchParams])
+  // Calculate spending per category
+  const categorySpending = {}
+  transactions
+    .filter((t) => t.type === 'expense')
+    .forEach((t) => {
+      categorySpending[t.categoryId] = (categorySpending[t.categoryId] || 0) + Number(t.amount || 0)
+    })
 
-  if (!budget) return null
-
-  const status = computeBudgetStatus(budget, expenses)
-  const currency = budget.currency || '$'
-
-  const handleOpenPremium = (featureName = '') => {
-    setPremiumHighlight(featureName)
-    setPremiumModalOpen(true)
-  }
-
-  const handleConfirmExpense = ({ amount, label, categoryId, paymentMethod, note }) => {
-    try {
-      store.addExpense({
-        budgetId: budget.id,
-        amount,
-        label,
-        categoryId,
-        paymentMethod,
-        note,
-      })
-      setAddExpenseOpen(false)
-      refresh()
-    } catch (err) {
-      if (err.message === 'FREE_LIMIT_REACHED') {
-        setAddExpenseOpen(false)
-        setLimitAlert(true)
-        handleOpenPremium('Unlimited Daily Spend Logging')
-      }
-    }
-  }
-
-  const handleSaveCustomCategory = (catData) => {
-    store.addCustomCategory(catData)
-    setCategories(store.getCategories())
-  }
-
-  const handleDeleteExpense = (id) => {
-    store.deleteExpense(id)
-    refresh()
-  }
-
-  const handleSignOut = async () => {
-    // Must await — signOut() now waits on the real Supabase sign-out too,
-    // so navigating before it resolves left the user state stale for a
-    // moment, causing Landing to think you were still logged in and bounce
-    // you right back (the dashboard <-> login flicker).
-    await signOut()
-    navigate('/')
-  }
-
-  // Check period ended state
-  if (status.periodEnded) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
-        <div className="w-16 h-16 rounded-3xl bg-[var(--color-brand)]/20 text-[var(--color-brand)] flex items-center justify-center mb-4 text-2xl">
-          🏁
-        </div>
-        <p className="font-mono text-xs tracking-[0.2em] text-[var(--color-text-dim)] uppercase mb-2">
-          Period Complete
-        </p>
-        <h1 className="font-display text-3xl font-bold mb-2">
-          You spent {currency}
-          {status.totalSpent.toFixed(2)} of {currency}
-          {status.totalBudget.toFixed(2)}
-        </h1>
-        <p className="text-sm text-[var(--color-text-dim)] mb-8 max-w-sm">
-          {status.remainingBudget >= 0
-            ? `Fantastic discipline! You finished ${currency}${status.remainingBudget.toFixed(2)} under your planned budget.`
-            : `You went ${currency}${Math.abs(status.remainingBudget).toFixed(2)} over your target budget.`}
-        </p>
-        <button
-          onClick={() => navigate('/onboarding')}
-          className="px-8 py-3.5 rounded-2xl bg-[var(--color-brand)] text-[var(--color-ink)] font-bold text-sm hover:brightness-110 shadow-lg shadow-amber-500/25 transition-all cursor-pointer"
-        >
-          Start a new budget
-        </button>
-      </div>
-    )
-  }
-
-  const todayExpensesCount = store.getTodayExpenses().length
+  // Left to spend progress percentage
+  const spendRatio = Math.min(100, Math.max(0, (summary.leftToSpend / (summary.budgetTotal || 1)) * 100))
 
   return (
-    <div className="min-h-screen pb-32">
-      {/* PRO SUCCESS TOAST (AFTER POLAR CHECKOUT) */}
-      {proSuccessToast && (
-        <div className="fixed top-5 inset-x-0 z-50 flex justify-center px-4 animate-bounce">
-          <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black px-5 py-3 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2.5 shadow-2xl shadow-amber-500/50">
-            <CheckCircle2 size={18} />
-            <span>Polar Payment Successful! Pro Member Superpowers Activated 👑</span>
+    <div className="min-h-screen pb-24 sm:pb-12 bg-[#f3f0ff]">
+      {/* Top Navbar */}
+      <Navbar
+        onOpenAddTransaction={() => setIsAddModalOpen(true)}
+        onUpgradeClick={(feat) => {
+          setHighlightFeature(feat || '')
+          setIsPremiumModalOpen(true)
+        }}
+      />
+
+      <main className="max-w-xl mx-auto px-4 pt-4 sm:pt-6 space-y-4">
+        {/* FIGMA TOP DATE & WALLET BAR */}
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-white border border-[#e8e4f5] flex items-center justify-center text-[#6c5ce7] shadow-xs">
+              <Calendar size={16} />
+            </div>
+            <div>
+              <h2 className="text-xs font-bold text-[#1f2430]">August</h2>
+              <p className="text-[10px] text-[#64748b] font-medium">01 Aug 24 - 31 Aug 24</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white border border-[#e8e4f5] shadow-xs">
+            <div className="flex items-center gap-1 px-2 py-1 text-xs font-bold text-[#6c5ce7]">
+              <span>{activeAccount.icon}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/settings')}
+              className="p-1 text-[#94a3b8] hover:text-[#1f2430] cursor-pointer"
+            >
+              <MoreVertical size={16} />
+            </button>
           </div>
         </div>
-      )}
 
-      {/* TOP NAVBAR */}
-      <Navbar onOpenPremium={handleOpenPremium} onSignOut={handleSignOut} />
-
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 pt-5 space-y-5">
-        {/* NAVIGATION TABS */}
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#0e131f] border border-[var(--color-line)] overflow-x-auto">
-          {[
-            { id: 'today', label: 'Today Dial', icon: Compass },
-            { id: 'analytics', label: 'Analytics & AI', icon: PieChart },
-            { id: 'subscriptions', label: 'Subscriptions', icon: Calendar },
-            { id: 'history', label: 'History', icon: History },
-          ].map((tab) => {
-            const Icon = tab.icon
-            const isSel = activeTab === tab.id
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 min-w-[90px] py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  isSel
-                    ? 'bg-[var(--color-panel-elevated)] text-[var(--color-brand)] shadow-md border border-[var(--color-brand)]/30'
-                    : 'text-[var(--color-text-dim)] hover:text-white'
-                }`}
-              >
-                <Icon size={14} />
-                <span>{tab.label}</span>
-              </button>
-            )
-          })}
+        {/* UPCOMING TRANSACTIONS PILL BANNER (FIGMA SCREEN 1) */}
+        <div
+          onClick={() => setShowUpcoming(!showUpcoming)}
+          className="flex items-center justify-between p-3.5 rounded-2xl bg-[#e6f4f1] border border-[#c7ede4] text-[#0f766e] cursor-pointer hover:bg-[#dcf0ec] transition-all shadow-xs"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-[#ccede6] flex items-center justify-center text-[#0d9488]">
+              <Receipt size={16} />
+            </div>
+            <span className="text-xs font-bold">Upcoming transactions</span>
+          </div>
+          <div className="flex items-center gap-1 text-[11px] font-semibold text-[#0d9488]">
+            <span>{recurringBills.length} scheduled</span>
+            <ChevronRight size={15} />
+          </div>
         </div>
 
-        {/* TAB 1: TODAY'S GAUGE VIEW */}
-        {activeTab === 'today' && (
-          <div className="space-y-4">
-            {/* INSTRUMENT GAUGE CARD */}
-            <div className="glass-panel-elevated rounded-3xl p-6 sm:p-8 flex flex-col items-center relative overflow-hidden">
-              <AllowanceGauge status={status} currency={currency} />
-            </div>
-
-            {/* KEY METRICS GRID */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div className="rounded-2xl bg-[#0e131f] border border-[var(--color-line)] p-4">
-                <p className="text-[11px] text-[var(--color-text-faint)] uppercase font-mono tracking-wider">
-                  Remaining Total
-                </p>
-                <p className="font-mono text-xl font-bold mt-1 text-white">
-                  {currency}{status.remainingBudget.toFixed(2)}
-                </p>
-                <p className="text-[10px] text-[var(--color-text-dim)] mt-0.5">
-                  of {currency}{status.totalBudget.toFixed(2)} total
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-[#0e131f] border border-[var(--color-line)] p-4">
-                <p className="text-[11px] text-[var(--color-text-faint)] uppercase font-mono tracking-wider">
-                  Days Left
-                </p>
-                <p className="font-mono text-xl font-bold mt-1 text-white">
-                  {status.daysRemaining} <span className="text-xs text-[var(--color-text-dim)] font-normal">days</span>
-                </p>
-                <p className="text-[10px] text-[var(--color-text-dim)] mt-0.5">
-                  until period reset
-                </p>
-              </div>
-
-              <div className="col-span-2 sm:col-span-1 rounded-2xl bg-[#0e131f] border border-[var(--color-line)] p-4">
-                <p className="text-[11px] text-[var(--color-text-faint)] uppercase font-mono tracking-wider">
-                  Tomorrow Preview
-                </p>
-                <p className="font-mono text-xl font-bold mt-1 text-[var(--color-safe)]">
-                  {currency}{status.tomorrowsAllowanceIfStopNow.toFixed(2)}
-                </p>
-                <p className="text-[10px] text-[var(--color-text-dim)] mt-0.5">
-                  if no more spend today
-                </p>
-              </div>
-            </div>
-
-            {/* FREE TIER DAILY QUOTA INFO */}
-            {!isPro && (
-              <div className="p-3 rounded-2xl bg-[#0e131f] border border-[var(--color-line)] flex items-center justify-between text-xs">
+        {/* UPCOMING BILLS ACCORDION */}
+        {showUpcoming && (
+          <div className="p-4 rounded-2xl bg-white border border-[#e8e4f5] space-y-2.5 animate-in fade-in zoom-in-95">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#94a3b8]">
+              Next Recurring Deductions
+            </p>
+            {recurringBills.map((bill) => (
+              <div key={bill.id} className="flex items-center justify-between text-xs py-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-amber-400">⚡</span>
-                  <span className="text-[var(--color-text-dim)]">
-                    Today's Free Spends: <strong className="text-white">{todayExpensesCount} / 5</strong>
-                  </span>
+                  <span>{bill.icon}</span>
+                  <span className="font-semibold text-[#1f2430]">{bill.name}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleOpenPremium('Unlimited Expense Logging')}
-                  className="text-xs text-[var(--color-brand)] font-bold hover:underline cursor-pointer"
-                >
-                  Unlock Unlimited ($1)
-                </button>
+                <div className="text-right">
+                  <span className="font-bold font-mono text-[#1f2430]">${bill.amount}</span>
+                  <span className="text-[10px] text-[#94a3b8] block">{bill.nextDate}</span>
+                </div>
               </div>
-            )}
-
-            {/* RECENT TRANSACTIONS */}
-            <div className="pt-2">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-bold text-white">Today & Recent Spends</h2>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('history')}
-                  className="text-xs text-[var(--color-text-dim)] hover:text-white transition-colors cursor-pointer"
-                >
-                  View all →
-                </button>
-              </div>
-              <ExpenseLog
-                expenses={expenses.slice(0, 5)}
-                categories={categories}
-                currency={currency}
-                onDelete={handleDeleteExpense}
-                onOpenPremium={handleOpenPremium}
-              />
-            </div>
+            ))}
           </div>
         )}
 
-        {/* TAB 2: ANALYTICS & AI INSIGHTS */}
-        {activeTab === 'analytics' && (
-          <AnalyticsView
-            budget={budget}
-            expenses={expenses}
-            categories={categories}
-            currency={currency}
-            onOpenPremium={handleOpenPremium}
-          />
-        )}
+        {/* HERO BALANCE CARD (FIGMA PURPLE GRADIENT CARD) */}
+        <div className="figma-hero-card p-6 relative overflow-hidden">
+          {/* Subtle circle glow */}
+          <div className="absolute top-0 right-0 w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
-        {/* TAB 3: RECURRING SUBSCRIPTIONS */}
-        {activeTab === 'subscriptions' && (
-          <SubscriptionsTracker
-            currency={currency}
-            onOpenPremium={handleOpenPremium}
-          />
-        )}
+          {/* Account Title */}
+          <div className="flex items-center justify-between mb-2">
+            <button
+              type="button"
+              onClick={() => navigate('/settings')}
+              className="flex items-center gap-1 text-xs font-medium text-white/80 hover:text-white transition-colors cursor-pointer"
+            >
+              <span>{activeAccount.name}</span>
+              <ChevronRight size={15} />
+            </button>
+          </div>
 
-        {/* TAB 4: FULL HISTORY */}
-        {activeTab === 'history' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+          {/* Big Hero Balance */}
+          <div className="my-2">
+            <span className="text-3xl sm:text-4xl font-extrabold font-mono tracking-tight text-white">
+              ${summary.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+
+          {/* Expense & Income Side-by-Side Pills */}
+          <div className="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-white/15">
+            {/* Expense */}
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-[#ff6b6b]/25 flex items-center justify-center text-[#ffa8a8]">
+                <TrendingDown size={18} />
+              </div>
               <div>
-                <h3 className="font-display text-base font-bold text-white">Full Spending History</h3>
-                <p className="text-xs text-[var(--color-text-dim)]">
-                  {expenses.length} total logged expenses
+                <p className="text-[10px] text-white/70 font-medium">Expense</p>
+                <p className="text-xs sm:text-sm font-bold font-mono text-white">
+                  ${summary.expense.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
-            <ExpenseLog
-              expenses={expenses}
-              categories={categories}
-              currency={currency}
-              onDelete={handleDeleteExpense}
-              onOpenPremium={handleOpenPremium}
-            />
+
+            {/* Income */}
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-[#22c55e]/25 flex items-center justify-center text-[#86efac]">
+                <TrendingUp size={18} />
+              </div>
+              <div>
+                <p className="text-[10px] text-white/70 font-medium">Income</p>
+                <p className="text-xs sm:text-sm font-bold font-mono text-white">
+                  ${summary.income.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
           </div>
-        )}
+        </div>
+
+        {/* "LEFT TO SPEND" PROGRESS CARD (FIGMA MINT CARD) */}
+        <div className="figma-mint-card p-5">
+          <div className="flex items-baseline justify-between mb-1.5">
+            <h3 className="text-xs font-bold text-[#1f2430]">Left to Spend</h3>
+            <span className="text-xs font-medium text-[#64748b]">
+              <strong className="text-[#1f2430] font-mono">
+                ${summary.leftToSpend.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </strong>{' '}
+              out of ${summary.budgetTotal.toLocaleString('en-US')}
+            </span>
+          </div>
+
+          {/* Segmented green progress bar */}
+          <div className="w-full h-3.5 rounded-full bg-[#dcfce7] p-0.5 mt-2 overflow-hidden relative flex items-center">
+            <div
+              className="h-full rounded-full bg-[#4ade80] transition-all duration-500 relative"
+              style={{ width: `${spendRatio}%` }}
+            >
+              {/* Divider indicator marker */}
+              <div className="absolute right-0 top-0 bottom-0 w-1 bg-[#16a34a] rounded-full" />
+            </div>
+          </div>
+        </div>
+
+        {/* EXPENSES CATEGORY BREAKDOWN LIST (FIGMA SCREEN 1) */}
+        <div className="figma-card p-5 space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-[#f1edf9]">
+            <h3 className="text-sm font-bold text-[#1f2430]">Expenses</h3>
+            <Link
+              to="/analytics"
+              className="text-xs font-semibold text-[#6c5ce7] hover:underline"
+            >
+              View all
+            </Link>
+          </div>
+
+          <div className="space-y-4">
+            {categories
+              .filter((cat) => categoryBudgets[cat.id] || categorySpending[cat.id])
+              .slice(0, 6)
+              .map((cat) => {
+                const spent = categorySpending[cat.id] || 0
+                const budgetLimit = categoryBudgets[cat.id] || cat.budget || 200
+                const left = Math.max(0, budgetLimit - spent)
+                const percent = Math.min(100, Math.round((spent / budgetLimit) * 100))
+
+                return (
+                  <div key={cat.id} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-base">{cat.icon}</span>
+                        <span className="font-semibold text-[#1f2430]">{cat.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-bold font-mono text-[#1f2430]">
+                          ${spent.toFixed(2)}
+                        </span>
+                        <span className="text-[10px] text-[#94a3b8] font-mono block">
+                          ${left.toFixed(2)} left
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="w-full h-2 rounded-full bg-[#f1edf9] overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${percent}%`,
+                          backgroundColor:
+                            percent > 90 ? '#ef4444' : percent > 70 ? '#f59e0b' : '#10b981',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+          </div>
+        </div>
       </main>
 
-      {/* FLOATING ACTION BUTTON */}
-      <div className="fixed bottom-6 inset-x-0 flex justify-center z-30 px-4 pointer-events-none">
-        <button
-          type="button"
-          onClick={() => setAddExpenseOpen(true)}
-          className="pointer-events-auto px-6 py-4 rounded-full bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-[var(--color-ink)] font-bold text-sm shadow-2xl shadow-amber-500/40 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2.5 cursor-pointer"
-        >
-          <Plus size={18} strokeWidth={3} />
-          <span>Log a Spend</span>
-        </button>
-      </div>
+      {/* BOTTOM NAV BAR & FLOATING ACTION BUTTON */}
+      <BottomNav onOpenAddTransaction={() => setIsAddModalOpen(true)} />
 
-      {/* MODALS */}
-      {addExpenseOpen && (
-        <AddExpenseModal
-          budget={budget}
-          expenses={expenses}
-          categories={categories}
-          currency={currency}
-          onClose={() => setAddExpenseOpen(false)}
-          onConfirm={handleConfirmExpense}
-          onOpenCustomCategory={() => {
-            setAddExpenseOpen(false)
-            setCustomCategoryOpen(true)
-          }}
-          onOpenPremium={handleOpenPremium}
-        />
-      )}
+      {/* IN-APP CALCULATOR ADD TRANSACTION MODAL */}
+      <AddTransactionModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdded={refreshData}
+        onUpgradeClick={(feat) => {
+          setHighlightFeature(feat || '')
+          setIsPremiumModalOpen(true)
+        }}
+      />
 
-      {customCategoryOpen && (
-        <CustomCategoryModal
-          isOpen={customCategoryOpen}
-          onClose={() => setCustomCategoryOpen(false)}
-          onSave={handleSaveCustomCategory}
-          onOpenPremium={handleOpenPremium}
-        />
-      )}
-
+      {/* PREMIUM UPGRADE MODAL */}
       <PremiumModal
-        isOpen={premiumModalOpen}
-        onClose={() => setPremiumModalOpen(false)}
-        highlightFeature={premiumHighlight}
+        isOpen={isPremiumModalOpen}
+        onClose={() => setIsPremiumModalOpen(false)}
+        highlightFeature={highlightFeature}
       />
     </div>
   )
