@@ -1,6 +1,6 @@
 // localStore.js
-// Persistent localStorage-backed data layer with per-user subscription scoping,
-// multi-account wallets, income & expense tracking, category budgets, and calendar feeds.
+// Persistent localStorage-backed data layer with user-scoped subscriptions,
+// multi-account wallets, income & expense tracking, and calendar views.
 
 import { DEFAULT_CATEGORIES } from './categories'
 
@@ -11,7 +11,7 @@ const KEYS = {
   accounts: 'bd_accounts',
   activeAccount: 'bd_active_account',
   categoryBudgets: 'bd_category_budgets',
-  subscription: 'bd_subscription',
+  subscriptionPrefix: 'bd_sub_',
   customCategories: 'bd_custom_categories',
   recurringBills: 'bd_recurring_bills',
   savingsGoal: 'bd_savings_goal',
@@ -61,14 +61,14 @@ export const localStore = {
     localStorage.removeItem(KEYS.user)
   },
 
-  // --- Subscriptions (Scoped per user to avoid free default bleeding) ---
-  getUserSubscriptionKey() {
-    const user = this.getUser()
-    return user?.email ? `bd_sub_${user.email.toLowerCase().trim()}` : KEYS.subscription
+  // --- Subscriptions (Scoped per user so new logins start on FREE plan) ---
+  getUserSubKey() {
+    const u = this.getUser()
+    return u?.email ? `${KEYS.subscriptionPrefix}${u.email.toLowerCase()}` : `${KEYS.subscriptionPrefix}anon`
   },
   getSubscription() {
-    const key = this.getUserSubscriptionKey()
-    return read(key, {
+    const subKey = this.getUserSubKey()
+    return read(subKey, {
       status: 'active',
       plan: 'free',
       isPro: false,
@@ -76,7 +76,7 @@ export const localStore = {
     })
   },
   setSubscription(sub) {
-    const key = this.getUserSubscriptionKey()
+    const subKey = this.getUserSubKey()
     const planInfo = PLANS[sub.plan] || PLANS.free
     const updated = {
       ...sub,
@@ -85,7 +85,7 @@ export const localStore = {
       planName: planInfo.name,
       updatedAt: new Date().toISOString(),
     }
-    write(key, updated)
+    write(subKey, updated)
     return updated
   },
   isProUser() {
@@ -164,45 +164,46 @@ export const localStore = {
     const txs = read(KEYS.transactions, null)
     if (txs) return txs
 
+    // Rich sample data from Figma screen
     const now = new Date()
-    const year = now.getFullYear()
-    const month = now.getMonth()
+    const y = now.getFullYear()
+    const m = now.getMonth()
 
     const initialTxs = [
       {
         id: 'tx-1',
         type: 'expense',
-        amount: 1700.00,
-        categoryId: 'rent',
-        note: 'Apartment Monthly Rent',
-        date: new Date(year, month, 1, 9, 30).toISOString(),
+        amount: 40.72,
+        categoryId: 'groceries',
+        note: 'Coles',
+        date: new Date(y, m, 10, 12, 35).toISOString(),
         accountId: 'default',
       },
       {
         id: 'tx-2',
         type: 'expense',
-        amount: 126.15,
-        categoryId: 'healthcare',
-        note: 'Pharmacy Prescription',
-        date: new Date(year, month, 8, 14, 15).toISOString(),
+        amount: 32.66,
+        categoryId: 'dining',
+        note: 'Bakery',
+        date: new Date(y, m, 10, 20, 0).toISOString(),
         accountId: 'default',
       },
       {
         id: 'tx-3',
         type: 'expense',
-        amount: 40.72,
-        categoryId: 'groceries',
-        note: 'Coles Supermarket',
-        date: new Date(year, month, 10, 12, 35).toISOString(),
+        amount: 1700.00,
+        categoryId: 'rent',
+        note: 'Rent',
+        date: new Date(y, m, 1, 9, 0).toISOString(),
         accountId: 'default',
       },
       {
         id: 'tx-4',
         type: 'expense',
-        amount: 32.66,
-        categoryId: 'dining',
-        note: 'Bakery Treats',
-        date: new Date(year, month, 10, 20, 0).toISOString(),
+        amount: 126.15,
+        categoryId: 'healthcare',
+        note: 'Healthcare prescription',
+        date: new Date(y, m, 5, 14, 20).toISOString(),
         accountId: 'default',
       },
       {
@@ -210,17 +211,17 @@ export const localStore = {
         type: 'expense',
         amount: 12.00,
         categoryId: 'dining',
-        note: 'Sushi Lunch',
-        date: new Date(year, month, 7, 13, 0).toISOString(),
+        note: 'Sushi',
+        date: new Date(y, m, 7, 13, 10).toISOString(),
         accountId: 'default',
       },
       {
         id: 'tx-6',
         type: 'expense',
-        amount: 425.00,
+        amount: 86.40,
         categoryId: 'shopping',
-        note: 'Electronics & Clothes',
-        date: new Date(year, month, 5, 17, 45).toISOString(),
+        note: 'Shopping',
+        date: new Date(y, m, 9, 16, 45).toISOString(),
         accountId: 'default',
       },
       {
@@ -228,8 +229,8 @@ export const localStore = {
         type: 'income',
         amount: 4500.00,
         categoryId: 'salary',
-        note: 'Monthly Net Salary',
-        date: new Date(year, month, 1, 8, 0).toISOString(),
+        note: 'Monthly Salary',
+        date: new Date(y, m, 1, 10, 0).toISOString(),
         accountId: 'default',
       },
     ]
@@ -250,6 +251,7 @@ export const localStore = {
     const isPro = this.isProUser()
     const todayTxs = this.getTodayExpenses()
 
+    // Free limit check: max 5 expenses per day
     if (tx.type === 'expense' && !isPro && todayTxs.length >= 5) {
       const error = new Error('FREE_LIMIT_REACHED')
       error.limit = 5
@@ -270,7 +272,6 @@ export const localStore = {
     write(KEYS.transactions, [newTx, ...txs])
     return newTx
   },
-
   deleteTransaction(id) {
     const txs = this.getTransactions()
     write(KEYS.transactions, txs.filter((t) => t.id !== id))
@@ -317,10 +318,6 @@ export const localStore = {
     }
     write(KEYS.customCategories, [...custom, newCat])
     return newCat
-  },
-  deleteCustomCategory(id) {
-    const custom = read(KEYS.customCategories, [])
-    write(KEYS.customCategories, custom.filter((c) => c.id !== id))
   },
 
   // --- Recurring Subscriptions / Upcoming ---

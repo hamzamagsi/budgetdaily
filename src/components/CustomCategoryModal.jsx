@@ -1,172 +1,132 @@
 import { useState } from 'react'
-import { EMOJI_PICKER_OPTIONS, COLOR_OPTIONS } from '../lib/categories'
-import { useAuth } from '../context/AuthContext'
-import { X, Sparkles, Plus, Crown } from 'lucide-react'
+import { store } from '../lib/store'
+import { ArrowLeft, Check, Sparkles, X } from 'lucide-react'
 
-export default function CustomCategoryModal({ isOpen, onClose, onSave, onOpenPremium }) {
-  const { isPro } = useAuth()
-  const [name, setName] = useState('')
-  const [selectedEmoji, setSelectedEmoji] = useState('☕')
-  const [selectedColor, setSelectedColor] = useState('#f59e0b')
-  const [error, setError] = useState('')
+export const FIGMA_ICONS = [
+  '👽', '🤖', '🍎', '🍏', '🎨', '🎖️', '💼', '🏛️',
+  '🏀', '👧', '🍺', '🚲', '🪙', '🦴', '📗', '🍔',
+  '🗓️', '📷', '🦯', '🐱', '☕', '📜', '📊', '🧀',
+  '♞', '🖲️', '🌲', '🕒', '🏠', '❤️', '🍣', '✈️'
+]
 
+export const FIGMA_COLORS = [
+  '#6c5ce7', '#ff6b6b', '#10b981', '#3b82f6',
+  '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6'
+]
+
+export default function CustomCategoryModal({ isOpen, onClose, onCreated }) {
   if (!isOpen) return null
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (!isPro) {
-      onOpenPremium('Custom Categories & Icon Maker')
-      return
-    }
+  const [selectedIcon, setSelectedIcon] = useState('🎨')
+  const [selectedColor, setSelectedColor] = useState('#6c5ce7')
+  const [name, setName] = useState('')
+  const [budget, setBudget] = useState('150')
+  const [error, setError] = useState('')
 
+  const handleSave = (e) => {
+    e.preventDefault()
     if (!name.trim()) {
       setError('Please enter a category name')
       return
     }
 
-    onSave({
+    store.addCustomCategory({
       name: name.trim(),
-      icon: selectedEmoji,
+      icon: selectedIcon,
       color: selectedColor,
+      budget: Number(budget) || 100,
     })
-    setName('')
+
+    onCreated?.()
     onClose()
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-      <div className="relative w-full max-w-md glass-panel-elevated rounded-3xl p-6 border border-[var(--color-line)] shadow-2xl">
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full bg-white/5 hover:bg-white/10 text-[var(--color-text-dim)] hover:text-white transition-colors"
-        >
-          <X size={16} />
-        </button>
-
-        <div className="flex items-center gap-2.5 mb-5">
-          <div className="w-10 h-10 rounded-2xl bg-[var(--color-brand)]/15 border border-[var(--color-brand)]/30 flex items-center justify-center text-[var(--color-brand)]">
-            <Sparkles size={20} />
-          </div>
-          <div>
-            <h3 className="font-display text-lg font-bold text-white flex items-center gap-2">
-              <span>Create Custom Category</span>
-              {!isPro && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--color-brand)] text-[var(--color-ink)] font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Crown size={10} /> PRO
-                </span>
-              )}
-            </h3>
-            <p className="text-xs text-[var(--color-text-dim)]">Customize your own icon, name, and color</p>
-          </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+      <div className="relative w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-[#e8e4f5] animate-in fade-in zoom-in-95">
+        {/* HEADER (FIGMA SCREEN 3) */}
+        <div className="flex items-center justify-between pb-4 border-b border-[#f1edf9] mb-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-1.5 text-xs font-bold text-[#6c5ce7] hover:opacity-80 cursor-pointer"
+          >
+            <ArrowLeft size={16} />
+            <span>Back</span>
+          </button>
+          <h3 className="text-sm font-bold text-[#1f2430]">Choose a category icon</h3>
+          <div className="w-6" />
         </div>
 
-        {!isPro && (
-          <div className="p-3.5 rounded-2xl bg-[rgba(245,158,11,0.12)] border border-[rgba(245,158,11,0.25)] mb-5 text-xs text-[var(--color-brand)] flex items-center justify-between">
-            <span>Unlock unlimited custom categories with Pro ($1/mo)</span>
-            <button
-              type="button"
-              onClick={() => onOpenPremium('Custom Categories')}
-              className="px-2.5 py-1 rounded-lg bg-[var(--color-brand)] text-[var(--color-ink)] font-bold text-[11px] hover:brightness-110"
-            >
-              Upgrade
-            </button>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Preview Badge */}
-          <div className="flex items-center justify-center py-4 bg-[#0e131f] rounded-2xl border border-[var(--color-line)]">
-            <div
-              className="px-4 py-2 rounded-2xl flex items-center gap-2.5 border"
-              style={{
-                background: `${selectedColor}18`,
-                borderColor: `${selectedColor}50`,
-                color: '#ffffff',
-              }}
-            >
-              <span className="text-2xl">{selectedEmoji}</span>
-              <span className="font-medium text-sm">{name || 'Your Category Name'}</span>
-            </div>
-          </div>
-
-          {/* Name Input */}
+        <form onSubmit={handleSave} className="space-y-4">
+          {/* ICON PICKER GRID (FIGMA SCREEN 3) */}
           <div>
-            <label className="block text-xs font-medium text-[var(--color-text-dim)] mb-1.5">
-              Category Name
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-[#94a3b8] mb-2">
+              Select Icon
             </label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Chai & Snacks, Gaming, Gym"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value)
-                setError('')
-              }}
-              className="w-full px-4 py-2.5 rounded-xl bg-[#0e131f] border border-[var(--color-line)] text-sm text-white outline-none focus:border-[var(--color-brand)] transition-all"
-            />
-            {error && <p className="text-xs text-[var(--color-over)] mt-1">{error}</p>}
-          </div>
-
-          {/* Emoji Picker Grid */}
-          <div>
-            <label className="block text-xs font-medium text-[var(--color-text-dim)] mb-1.5">
-              Choose Icon / Emoji
-            </label>
-            <div className="grid grid-cols-8 gap-1.5 p-2 bg-[#0e131f] rounded-xl border border-[var(--color-line)] max-h-36 overflow-y-auto">
-              {EMOJI_PICKER_OPTIONS.map((emoji, idx) => (
+            <div className="grid grid-cols-4 gap-2.5 p-3 rounded-2xl bg-[#f8f6ff] border border-[#e8e4f5] max-h-48 overflow-y-auto">
+              {FIGMA_ICONS.map((icon) => (
                 <button
-                  key={idx}
+                  key={icon}
                   type="button"
-                  onClick={() => setSelectedEmoji(emoji)}
-                  className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all ${
-                    selectedEmoji === emoji
-                      ? 'bg-[var(--color-panel-elevated)] ring-2 ring-[var(--color-brand)] scale-110'
-                      : 'hover:bg-white/5'
+                  onClick={() => setSelectedIcon(icon)}
+                  className={`h-11 rounded-xl text-2xl flex items-center justify-center transition-all cursor-pointer ${
+                    selectedIcon === icon
+                      ? 'bg-white border-2 border-[#6c5ce7] shadow-sm scale-105'
+                      : 'hover:bg-white/80'
                   }`}
                 >
-                  {emoji}
+                  {icon}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Color Picker */}
+          {/* CATEGORY NAME */}
           <div>
-            <label className="block text-xs font-medium text-[var(--color-text-dim)] mb-1.5">
-              Choose Color Tag
+            <label className="block text-xs font-semibold text-[#64748b] mb-1">
+              Category Name
             </label>
-            <div className="flex items-center gap-2 overflow-x-auto py-1">
-              {COLOR_OPTIONS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => setSelectedColor(color)}
-                  className={`w-7 h-7 rounded-full shrink-0 transition-transform ${
-                    selectedColor === color ? 'scale-125 ring-2 ring-white ring-offset-2 ring-offset-[#0e131f]' : 'hover:scale-110'
-                  }`}
-                  style={{ background: color }}
-                />
-              ))}
+            <div className="flex items-center gap-2">
+              <span className="w-10 h-10 rounded-xl bg-[#f8f6ff] border border-[#e8e4f5] flex items-center justify-center text-xl shrink-0">
+                {selectedIcon}
+              </span>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Gaming, Snacks, Gym..."
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value)
+                  setError('')
+                }}
+                className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-[#f8f6ff] border border-[#e8e4f5] text-[#1f2430] outline-none focus:border-[#6c5ce7]"
+              />
             </div>
           </div>
 
-          <div className="flex gap-2.5 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-3 rounded-xl border border-[var(--color-line)] text-xs text-[var(--color-text-dim)] hover:text-white transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 py-3 rounded-xl bg-[var(--color-brand)] text-[var(--color-ink)] font-bold text-xs hover:brightness-110 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-[var(--color-brand)]/20"
-            >
-              <Plus size={16} />
-              <span>Save Category</span>
-            </button>
+          {/* MONTHLY BUDGET LIMIT */}
+          <div>
+            <label className="block text-xs font-semibold text-[#64748b] mb-1">
+              Monthly Limit ($)
+            </label>
+            <input
+              type="number"
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+              className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-[#f8f6ff] border border-[#e8e4f5] text-[#1f2430] outline-none focus:border-[#6c5ce7] font-mono font-bold"
+            />
           </div>
+
+          {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
+
+          <button
+            type="submit"
+            className="w-full py-3.5 rounded-2xl bg-[#6c5ce7] hover:bg-[#5849cf] text-white text-xs font-bold shadow-lg shadow-[#6c5ce7]/25 transition-all cursor-pointer flex items-center justify-center gap-2"
+          >
+            <Check size={16} />
+            <span>Create Category</span>
+          </button>
         </form>
       </div>
     </div>
