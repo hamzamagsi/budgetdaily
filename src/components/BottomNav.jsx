@@ -1,13 +1,15 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Home, Calendar, BarChart3, Settings, Plus } from 'lucide-react'
+import { Home, Calendar, BarChart3, Settings, Plus, Layers, Tag } from 'lucide-react'
 
 export default function BottomNav({ onOpenAddTransaction }) {
   const location = useLocation()
 
   const tabs = [
     { path: '/dashboard', label: 'Home', icon: Home },
-    { path: '/budgets', label: 'Budgets', icon: Calendar },
+    { path: '/calendar', label: 'Calendar', icon: Calendar },
+    { path: '/budgets', label: 'Budgets', icon: Layers },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
+    { path: '/categories', label: 'Categories', icon: Tag },
     { path: '/settings', label: 'Settings', icon: Settings },
   ]
 
@@ -23,8 +25,8 @@ export default function BottomNav({ onOpenAddTransaction }) {
         <Plus size={28} strokeWidth={2.5} />
       </button>
 
-      {/* BOTTOM TAB BAR FOR MOBILE & RESPONSIVE DESKTOP */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-[#ede9fe] py-2 px-6 flex items-center justify-around sm:hidden shadow-lg">
+      {/* BOTTOM TAB BAR FOR MOBILE */}
+      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-[#ede9fe] py-2 px-3 flex items-center justify-around lg:hidden shadow-lg">
         {tabs.map((tab) => {
           const Icon = tab.icon
           const isActive = location.pathname === tab.path
@@ -32,12 +34,12 @@ export default function BottomNav({ onOpenAddTransaction }) {
             <Link
               key={tab.path}
               to={tab.path}
-              className={`flex flex-col items-center gap-1 transition-colors ${
+              className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition-colors ${
                 isActive ? 'text-[#6c5ce7] font-bold' : 'text-[#94a3b8] hover:text-[#64748b]'
               }`}
             >
-              <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-              <span className="text-[10px]">{tab.label}</span>
+              <Icon size={19} strokeWidth={isActive ? 2.5 : 2} />
+              <span className="text-[9px]">{tab.label}</span>
             </Link>
           )
         })}

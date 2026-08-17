@@ -1,6 +1,6 @@
 // localStore.js
-// Persistent localStorage-backed data layer with multi-account wallets,
-// income & expense tracking, category budgets, and recurring subscriptions.
+// Persistent localStorage-backed data layer with per-user subscription scoping,
+// multi-account wallets, income & expense tracking, category budgets, and calendar feeds.
 
 import { DEFAULT_CATEGORIES } from './categories'
 
@@ -61,9 +61,14 @@ export const localStore = {
     localStorage.removeItem(KEYS.user)
   },
 
-  // --- Subscriptions ---
+  // --- Subscriptions (Scoped per user to avoid free default bleeding) ---
+  getUserSubscriptionKey() {
+    const user = this.getUser()
+    return user?.email ? `bd_sub_${user.email.toLowerCase().trim()}` : KEYS.subscription
+  },
   getSubscription() {
-    return read(KEYS.subscription, {
+    const key = this.getUserSubscriptionKey()
+    return read(key, {
       status: 'active',
       plan: 'free',
       isPro: false,
@@ -71,6 +76,7 @@ export const localStore = {
     })
   },
   setSubscription(sub) {
+    const key = this.getUserSubscriptionKey()
     const planInfo = PLANS[sub.plan] || PLANS.free
     const updated = {
       ...sub,
@@ -79,7 +85,7 @@ export const localStore = {
       planName: planInfo.name,
       updatedAt: new Date().toISOString(),
     }
-    write(KEYS.subscription, updated)
+    write(key, updated)
     return updated
   },
   isProUser() {
@@ -109,7 +115,6 @@ export const localStore = {
     const active = budgets.find((b) => b.active)
     if (active) return active
 
-    // Default August monthly budget matching Figma
     const defaultBudget = {
       id: 'budget-aug-2024',
       name: 'August Budget',
@@ -131,17 +136,6 @@ export const localStore = {
     const filtered = budgets.filter((b) => b.id !== active.id)
     write(KEYS.budgets, [...filtered, updated])
     return updated
-  },
-  createBudget(budget) {
-    const budgets = read(KEYS.budgets, []).map((b) => ({ ...b, active: false }))
-    const newBudget = {
-      id: crypto.randomUUID(),
-      active: true,
-      createdAt: new Date().toISOString(),
-      ...budget,
-    }
-    write(KEYS.budgets, [...budgets, newBudget])
-    return newBudget
   },
 
   // --- Category Budgets ---
@@ -170,7 +164,10 @@ export const localStore = {
     const txs = read(KEYS.transactions, null)
     if (txs) return txs
 
-    // Initial Figma mock data
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth()
+
     const initialTxs = [
       {
         id: 'tx-1',
@@ -178,7 +175,7 @@ export const localStore = {
         amount: 1700.00,
         categoryId: 'rent',
         note: 'Apartment Monthly Rent',
-        date: new Date(Date.now() - 86400000 * 2).toISOString(),
+        date: new Date(year, month, 1, 9, 30).toISOString(),
         accountId: 'default',
       },
       {
@@ -187,25 +184,43 @@ export const localStore = {
         amount: 126.15,
         categoryId: 'healthcare',
         note: 'Pharmacy Prescription',
-        date: new Date(Date.now() - 86400000).toISOString(),
+        date: new Date(year, month, 8, 14, 15).toISOString(),
         accountId: 'default',
       },
       {
         id: 'tx-3',
         type: 'expense',
-        amount: 12.00,
-        categoryId: 'dining',
-        note: 'Sushi',
-        date: new Date().toISOString(),
+        amount: 40.72,
+        categoryId: 'groceries',
+        note: 'Coles Supermarket',
+        date: new Date(year, month, 10, 12, 35).toISOString(),
         accountId: 'default',
       },
       {
         id: 'tx-4',
         type: 'expense',
-        amount: 338.29,
-        categoryId: 'groceries',
-        note: 'Weekly Whole Foods groceries',
-        date: new Date(Date.now() - 86400000 * 3).toISOString(),
+        amount: 32.66,
+        categoryId: 'dining',
+        note: 'Bakery Treats',
+        date: new Date(year, month, 10, 20, 0).toISOString(),
+        accountId: 'default',
+      },
+      {
+        id: 'tx-5',
+        type: 'expense',
+        amount: 12.00,
+        categoryId: 'dining',
+        note: 'Sushi Lunch',
+        date: new Date(year, month, 7, 13, 0).toISOString(),
+        accountId: 'default',
+      },
+      {
+        id: 'tx-6',
+        type: 'expense',
+        amount: 425.00,
+        categoryId: 'shopping',
+        note: 'Electronics & Clothes',
+        date: new Date(year, month, 5, 17, 45).toISOString(),
         accountId: 'default',
       },
       {
@@ -214,7 +229,7 @@ export const localStore = {
         amount: 4500.00,
         categoryId: 'salary',
         note: 'Monthly Net Salary',
-        date: new Date(Date.now() - 86400000 * 15).toISOString(),
+        date: new Date(year, month, 1, 8, 0).toISOString(),
         accountId: 'default',
       },
     ]
@@ -222,7 +237,6 @@ export const localStore = {
     return initialTxs
   },
 
-  // Backwards compatibility for getExpenses
   getExpenses() {
     return this.getTransactions().filter((t) => t.type === 'expense')
   },
@@ -236,7 +250,6 @@ export const localStore = {
     const isPro = this.isProUser()
     const todayTxs = this.getTodayExpenses()
 
-    // Free limit check on expenses
     if (tx.type === 'expense' && !isPro && todayTxs.length >= 5) {
       const error = new Error('FREE_LIMIT_REACHED')
       error.limit = 5
@@ -245,7 +258,7 @@ export const localStore = {
 
     const newTx = {
       id: crypto.randomUUID(),
-      type: tx.type || 'expense', // 'expense' | 'income'
+      type: tx.type || 'expense',
       amount: Number(tx.amount) || 0,
       categoryId: tx.categoryId || (tx.type === 'income' ? 'salary' : 'dining'),
       note: tx.note || '',
@@ -257,15 +270,10 @@ export const localStore = {
     write(KEYS.transactions, [newTx, ...txs])
     return newTx
   },
-  addExpense(exp) {
-    return this.addTransaction({ ...exp, type: 'expense' })
-  },
+
   deleteTransaction(id) {
     const txs = this.getTransactions()
     write(KEYS.transactions, txs.filter((t) => t.id !== id))
-  },
-  deleteExpense(id) {
-    this.deleteTransaction(id)
   },
 
   // --- Financial Aggregates ---
@@ -309,6 +317,10 @@ export const localStore = {
     }
     write(KEYS.customCategories, [...custom, newCat])
     return newCat
+  },
+  deleteCustomCategory(id) {
+    const custom = read(KEYS.customCategories, [])
+    write(KEYS.customCategories, custom.filter((c) => c.id !== id))
   },
 
   // --- Recurring Subscriptions / Upcoming ---

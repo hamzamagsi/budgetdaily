@@ -4,8 +4,10 @@ import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Onboarding from './pages/Onboarding'
 import Dashboard from './pages/Dashboard'
+import CalendarView from './pages/CalendarView'
 import BudgetManager from './pages/BudgetManager'
 import Analytics from './pages/Analytics'
+import CategoriesManager from './pages/CategoriesManager'
 import Settings from './pages/Settings'
 import Subscribe from './pages/Subscribe'
 
@@ -41,6 +43,14 @@ export default function App() {
             }
           />
           <Route
+            path="/calendar"
+            element={
+              <RequireAuth>
+                <CalendarView />
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/budgets"
             element={
               <RequireAuth>
@@ -53,6 +63,14 @@ export default function App() {
             element={
               <RequireAuth>
                 <Analytics />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/categories"
+            element={
+              <RequireAuth>
+                <CategoriesManager />
               </RequireAuth>
             }
           />
