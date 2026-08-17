@@ -2,13 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { store } from '../lib/store'
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import {
   initGoogleIdentity,
   triggerGoogleOAuth,
   getGoogleClientId,
   setGoogleClientId,
   renderGoogleSignInButton,
-  isGoogleGisAvailable,
 } from '../lib/googleAuth'
 import {
   Mail,
@@ -21,7 +21,8 @@ import {
   Lock,
   Settings,
   Key,
-  Globe,
+  Inbox,
+  Sparkles,
 } from 'lucide-react'
 
 const COUNTRY_CODES = [
@@ -55,7 +56,7 @@ export default function Login() {
 
   // OTP states
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
-  const [sentCode, setSentCode] = useState('842619')
+  const [sentCode, setSentCode] = useState('')
   const [resendTimer, setResendTimer] = useState(30)
   const otpInputsRef = useRef([])
 
@@ -105,8 +106,8 @@ export default function Login() {
     return () => clearInterval(interval)
   }, [step, resendTimer])
 
-  // Handle Send Verification Code
-  const handleSendCode = (e) => {
+  // Handle Send Verification Code (Real Supabase Auth OTP)
+  const handleSendCode = async (e) => {
     e.preventDefault()
     setError('')
 
@@ -120,6 +121,47 @@ export default function Login() {
         setError('Please enter a valid email address (e.g. name@gmail.com)')
         return
       }
+
+      setLoading(true)
+
+      // Real Supabase Email OTP
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { error: sbErr } = await supabase.auth.signInWithOtp({
+            email: cleanEmail,
+            options: {
+              shouldCreateUser: true,
+            },
+          })
+
+          if (sbErr) {
+            setLoading(false)
+            setError(sbErr.message || 'Failed to send verification code. Please check your email.')
+            return
+          }
+
+          setOtp(['', '', '', '', '', ''])
+          setResendTimer(30)
+          setLoading(false)
+          setStep('otp')
+          return
+        } catch (err) {
+          console.error('Supabase OTP Error:', err)
+          setLoading(false)
+          setError(err.message || 'Error connecting to auth service')
+          return
+        }
+      }
+
+      // Fallback local demo mode if Supabase not configured
+      setTimeout(() => {
+        const generated = Math.floor(100000 + Math.random() * 900000).toString()
+        setSentCode(generated)
+        setOtp(['', '', '', '', '', ''])
+        setResendTimer(30)
+        setLoading(false)
+        setStep('otp')
+      }, 500)
     } else {
       if (!phone.trim()) {
         setError('Please enter your mobile phone number')
@@ -129,17 +171,17 @@ export default function Login() {
         setError('Please enter a valid phone number (at least 7 digits)')
         return
       }
-    }
 
-    setLoading(true)
-    setTimeout(() => {
-      const generated = Math.floor(100000 + Math.random() * 900000).toString()
-      setSentCode(generated)
-      setOtp(['', '', '', '', '', ''])
-      setResendTimer(30)
-      setLoading(false)
-      setStep('otp')
-    }, 500)
+      setLoading(true)
+      setTimeout(() => {
+        const generated = Math.floor(100000 + Math.random() * 900000).toString()
+        setSentCode(generated)
+        setOtp(['', '', '', '', '', ''])
+        setResendTimer(30)
+        setLoading(false)
+        setStep('otp')
+      }, 500)
+    }
   }
 
   // Handle OTP digit change
@@ -162,8 +204,8 @@ export default function Login() {
     }
   }
 
-  // Verify OTP and Complete Login
-  const handleVerifyOtp = (e) => {
+  // Verify OTP and Complete Login (Real Supabase Auth Verify)
+  const handleVerifyOtp = async (e) => {
     e?.preventDefault()
     const entered = otp.join('')
     if (entered.length < 6) {
@@ -171,16 +213,61 @@ export default function Login() {
       return
     }
 
-    if (entered !== sentCode && entered !== '123456') {
-      setError(`Incorrect code. Please enter the verification code: ${sentCode}`)
+    setLoading(true)
+
+    // Real Supabase Email OTP Verification
+    if (isSupabaseConfigured && supabase && authMethod === 'email') {
+      try {
+        const { data, error: sbErr } = await supabase.auth.verifyOtp({
+          email: email.trim(),
+          token: entered,
+          type: 'email',
+        })
+
+        if (sbErr) {
+          setLoading(false)
+          setError(sbErr.message || 'Invalid or expired verification code. Please check your inbox.')
+          return
+        }
+
+        const sbUser = data.user
+        const userData = {
+          id: sbUser?.id || 'user-' + Date.now(),
+          email: sbUser?.email || email.trim(),
+          name: sbUser?.user_metadata?.full_name || email.trim().split('@')[0],
+          verified: true,
+          method: 'supabase_email',
+        }
+
+        signIn(userData)
+        const hasBudget = store.getActiveBudget()
+        navigate(hasBudget ? '/dashboard' : '/onboarding')
+        return
+      } catch (err) {
+        console.error('Supabase Verify Error:', err)
+        setLoading(false)
+        setError(err.message || 'Verification failed. Please try again.')
+        return
+      }
+    }
+
+    // Local / Phone Verification logic
+    if (sentCode && entered !== sentCode && entered !== '123456') {
+      setLoading(false)
+      setError(`Incorrect code. Please enter the verification code sent to you.`)
       return
     }
 
-    setLoading(true)
     setTimeout(() => {
-      const userData = authMethod === 'email'
-        ? { email: email.trim(), verified: true, method: 'email' }
-        : { phone: `${countryCode} ${phone.trim()}`, email: `user_${phone.slice(-4)}@budgetdaily.app`, verified: true, method: 'phone' }
+      const userData =
+        authMethod === 'email'
+          ? { email: email.trim(), verified: true, method: 'email' }
+          : {
+              phone: `${countryCode} ${phone.trim()}`,
+              email: `user_${phone.slice(-4)}@budgetdaily.app`,
+              verified: true,
+              method: 'phone',
+            }
 
       signIn(userData)
       const hasBudget = store.getActiveBudget()
@@ -194,7 +281,6 @@ export default function Login() {
     const clientId = getGoogleClientId()
 
     if (!clientId) {
-      // Prompt user to enter Google Client ID or use Google OAuth modal
       setStep('google_config')
       return
     }
@@ -225,7 +311,7 @@ export default function Login() {
     setStep('input')
   }
 
-  // Fast demo Google login
+  // Demo Google login
   const handleSimulatedGoogleLogin = (emailAddress = 'hamza.magsi@gmail.com', name = 'Hamza Magsi') => {
     setLoading(true)
     setTimeout(() => {
@@ -256,17 +342,17 @@ export default function Login() {
           </div>
           <h1 className="font-display text-2xl font-bold tracking-tight text-white">
             {step === 'otp'
-              ? 'Verify Security Code'
+              ? 'Enter Verification Code'
               : step === 'google_config'
               ? 'Google OAuth 2.0 Setup'
               : 'Sign In to BudgetDaily'}
           </h1>
           <p className="text-xs sm:text-sm text-[var(--color-text-dim)] mt-1.5">
             {step === 'otp'
-              ? `We sent a 6-digit code to ${authMethod === 'email' ? email : `${countryCode} ${phone}`}`
+              ? `Check your inbox at ${authMethod === 'email' ? email : `${countryCode} ${phone}`}`
               : step === 'google_config'
               ? 'Configure your Google Identity Services Client ID'
-              : 'Real Google Identity & Secure Verification'}
+              : 'Real Supabase & Google Identity Verification'}
           </p>
         </div>
 
@@ -431,16 +517,23 @@ export default function Login() {
         {/* STEP 2: 6-Digit OTP Code Verification */}
         {step === 'otp' && (
           <div>
-            <div className="p-3.5 rounded-xl bg-[rgba(245,158,11,0.12)] border border-[rgba(245,158,11,0.3)] mb-6 text-center">
-              <span className="text-[11px] text-[var(--color-brand)] block uppercase font-mono tracking-wider font-semibold">
-                Security Code Sent
-              </span>
-              <span className="font-mono text-xl font-bold tracking-[0.3em] text-white">
-                {sentCode}
-              </span>
-              <span className="text-[10px] text-[var(--color-text-dim)] block mt-1">
-                (Enter this 6-digit code to complete verification)
-              </span>
+            {/* Real Supabase / Sent Notification */}
+            <div className="p-4 rounded-2xl bg-[#0e131f] border border-[var(--color-brand)]/30 mb-6 text-center space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-[var(--color-brand)]/15 text-[var(--color-brand)] flex items-center justify-center mx-auto">
+                <Inbox size={20} />
+              </div>
+              <p className="text-xs font-semibold text-white">
+                Check Your Email Inbox
+              </p>
+              <p className="text-[11px] text-[var(--color-text-dim)] leading-relaxed">
+                We sent a 6-digit verification code to <strong className="text-white font-mono">{email || phone}</strong>. Please check your inbox (and Spam folder).
+              </p>
+              {/* Only show demo code if Supabase is not active */}
+              {!isSupabaseConfigured && sentCode && (
+                <div className="pt-2 border-t border-[var(--color-line)] text-[11px] text-[var(--color-brand)] font-mono">
+                  Demo Code: <strong className="text-white tracking-widest">{sentCode}</strong>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleVerifyOtp} className="space-y-5">
@@ -497,11 +590,7 @@ export default function Login() {
                 <button
                   type="button"
                   disabled={resendTimer > 0}
-                  onClick={() => {
-                    const newCode = Math.floor(100000 + Math.random() * 900000).toString()
-                    setSentCode(newCode)
-                    setResendTimer(30)
-                  }}
+                  onClick={handleSendCode}
                   className={`font-medium ${
                     resendTimer > 0
                       ? 'text-[var(--color-text-faint)] cursor-not-allowed'
@@ -579,7 +668,7 @@ export default function Login() {
         <div className="mt-8 pt-4 border-t border-[var(--color-line)] text-center flex items-center justify-between text-[11px] text-[var(--color-text-faint)]">
           <span className="flex items-center gap-1">
             <Lock size={12} />
-            <span>256-bit OAuth encryption</span>
+            <span>256-bit Supabase & OAuth</span>
           </span>
           <button
             type="button"

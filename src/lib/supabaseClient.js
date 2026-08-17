@@ -1,11 +1,19 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const rawUrl =
+  import.meta.env.VITE_SUPABASE_URL ||
+  'https://ntqdpadurkidossorggo.supabase.co'
 
-// If you haven't set up Supabase yet, this stays null and the app
-// automatically runs on the local (localStorage) data layer instead.
-// See README.md -> "Connecting Supabase" to switch to the real backend.
-export const supabase = url && anonKey ? createClient(url, anonKey) : null
+const anonKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  'sb_publishable_WTyAlOa7bSBla69D108uLQ_2VMIMnQ0'
+
+// Normalize URL: remove any /rest/v1 or trailing slashes
+const normalizedUrl = rawUrl
+  ? rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '')
+  : ''
+
+export const supabase =
+  normalizedUrl && anonKey ? createClient(normalizedUrl, anonKey) : null
 
 export const isSupabaseConfigured = !!supabase
