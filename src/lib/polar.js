@@ -1,8 +1,6 @@
 // polar.js
 // Real Polar.sh Payment Gateway Integration for BudgetDaily
-// Connected with live Polar Checkout Links:
-// 1. Monthly ($1.99), 6-Month ($9.99), 1-Year ($19.99): https://buy.polar.sh/polar_cl_7y25tiJCkjzmPhBzMsg0rxXmoTJ2dBZeJk3KI0wuCvd
-// 2. Lifetime ($100.00): https://buy.polar.sh/polar_cl_CETfGLCeSHolX0aXDO9IrGsZpoij9GG7ivBs010SPe4
+// Checkout Link: https://buy.polar.sh/polar_cl_CETfGLCeSHolX0aXDO9IrGsZpoij9GG7ivBs010SPe4
 
 export const POLAR_PLANS = {
   monthly: {
@@ -12,7 +10,7 @@ export const POLAR_PLANS = {
     priceNum: 1.99,
     period: '/ month',
     billing: 'Billed monthly · cancel anytime',
-    checkoutUrl: 'https://buy.polar.sh/polar_cl_7y25tiJCkjzmPhBzMsg0rxXmoTJ2dBZeJk3KI0wuCvd',
+    checkoutUrl: 'https://buy.polar.sh/polar_cl_CETfGLCeSHolX0aXDO9IrGsZpoij9GG7ivBs010SPe4',
   },
   half_yearly: {
     id: 'half_yearly',
@@ -21,7 +19,7 @@ export const POLAR_PLANS = {
     priceNum: 9.99,
     period: 'for 6 mo',
     billing: 'Save upfront · $1.66/mo',
-    checkoutUrl: 'https://buy.polar.sh/polar_cl_7y25tiJCkjzmPhBzMsg0rxXmoTJ2dBZeJk3KI0wuCvd',
+    checkoutUrl: 'https://buy.polar.sh/polar_cl_CETfGLCeSHolX0aXDO9IrGsZpoij9GG7ivBs010SPe4',
   },
   yearly: {
     id: 'yearly',
@@ -30,15 +28,6 @@ export const POLAR_PLANS = {
     priceNum: 19.99,
     period: '/ year',
     billing: 'Best value · Only $1.66/month',
-    checkoutUrl: 'https://buy.polar.sh/polar_cl_7y25tiJCkjzmPhBzMsg0rxXmoTJ2dBZeJk3KI0wuCvd',
-  },
-  lifetime: {
-    id: 'lifetime',
-    name: 'Pro Lifetime Access',
-    price: '$100',
-    priceNum: 100.0,
-    period: 'one-time',
-    billing: 'Pay once, own forever · No renewals',
     checkoutUrl: 'https://buy.polar.sh/polar_cl_CETfGLCeSHolX0aXDO9IrGsZpoij9GG7ivBs010SPe4',
   },
 }
@@ -47,7 +36,7 @@ export const POLAR_PLANS = {
  * Initiates Real Polar.sh Hosted Checkout.
  * Directly navigates the user's browser to the official Polar.sh Checkout page.
  */
-export function redirectToPolarCheckout({ planId, email }) {
+export function redirectToPolarCheckout({ planId, email } = {}) {
   const plan = POLAR_PLANS[planId] || POLAR_PLANS.monthly
   const targetUrl = plan.checkoutUrl
 

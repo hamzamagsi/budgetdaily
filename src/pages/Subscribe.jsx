@@ -65,7 +65,7 @@ export default function Subscribe() {
 
       <div className="space-y-8">
         {/* PRICING PLANS GRID */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {PRICING_PLANS.map((plan) => {
             const isSelected = selectedPlan === plan.id
             return (
