@@ -2,108 +2,33 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { PRICING_PLANS, FREE_FEATURES, PREMIUM_FEATURES } from '../components/PremiumModal'
-import confetti from 'canvas-confetti'
+import { redirectToPolarCheckout } from '../lib/polar'
 import {
   Crown,
   Check,
   Zap,
   Shield,
   ArrowLeft,
-  CheckCircle2,
   Sparkles,
-  AlertCircle,
-  CreditCard,
-  Calendar,
-  Key,
-  Lock,
   Loader2,
-  Receipt,
   ExternalLink,
 } from 'lucide-react'
 
 export default function Subscribe() {
-  const { user, isPro, upgradePlan } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [selectedPlan, setSelectedPlan] = useState('monthly')
-  const [step, setStep] = useState('plans')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  const [cardNumber, setCardNumber] = useState('')
-  const [cardExpiry, setCardExpiry] = useState('')
-  const [cardCvc, setCardCvc] = useState('')
-  const [cardName, setCardName] = useState(user?.name || '')
 
   const currentPlan = PRICING_PLANS.find((p) => p.id === selectedPlan) || PRICING_PLANS[0]
 
-  const handleCardNumberChange = (e) => {
-    const raw = e.target.value.replace(/\D/g, '').slice(0, 16)
-    const formatted = raw.replace(/(\d{4})/g, '$1 ').trim()
-    setCardNumber(formatted)
-    setError('')
-  }
-
-  const handleExpiryChange = (e) => {
-    const raw = e.target.value.replace(/\D/g, '').slice(0, 4)
-    if (raw.length >= 2) {
-      setCardExpiry(`${raw.slice(0, 2)}/${raw.slice(2)}`)
-    } else {
-      setCardExpiry(raw)
-    }
-    setError('')
-  }
-
-  const handleStartCheckout = () => {
-    setError('')
-    const customUrl = import.meta.env.VITE_POLAR_CHECKOUT_URL
-    if (customUrl) {
-      window.location.href = customUrl
-      return
-    }
-    setStep('checkout')
-  }
-
-  const handleProcessPayment = (e) => {
-    e.preventDefault()
-    setError('')
-
-    const cleanCard = cardNumber.replace(/\s/g, '')
-    if (cleanCard.length < 15) {
-      setError('Please enter a valid 16-digit card number')
-      return
-    }
-
-    if (!cardExpiry || cardExpiry.length < 5) {
-      setError('Please enter a valid MM/YY expiration date')
-      return
-    }
-
-    if (!cardCvc || cardCvc.length < 3) {
-      setError('Please enter a valid 3 or 4-digit CVC/CVV security code')
-      return
-    }
-
+  const handleSubscribe = async () => {
     setLoading(true)
-
-    setTimeout(() => {
-      upgradePlan(selectedPlan)
-      setLoading(false)
-      setStep('success')
-
-      try {
-        confetti({
-          particleCount: 120,
-          spread: 80,
-          origin: { y: 0.55 },
-          colors: ['#6c5ce7', '#10b981', '#f59e0b'],
-        })
-      } catch (e) {}
-
-      setTimeout(() => {
-        navigate('/dashboard')
-        window.dispatchEvent(new Event('storage_change'))
-      }, 2000)
-    }, 1200)
+    await redirectToPolarCheckout({
+      planId: selectedPlan,
+      email: user?.email,
+      userId: user?.id,
+    })
   }
 
   return (
@@ -138,278 +63,142 @@ export default function Subscribe() {
         </p>
       </div>
 
-      {step === 'success' ? (
-        <div className="figma-card p-12 text-center max-w-md mx-auto space-y-4 border-2 border-[#86efac]">
-          <div className="w-16 h-16 rounded-full bg-[#dcfce7] text-[#16a34a] flex items-center justify-center mx-auto shadow-xl shadow-[#16a34a]/20">
-            <CheckCircle2 size={36} />
-          </div>
-          <h2 className="text-2xl font-bold text-[#1f2430]">Subscription Active!</h2>
-          <p className="text-sm text-[#64748b]">
-            Payment confirmed. Redirecting you to your upgraded dashboard…
-          </p>
-        </div>
-      ) : step === 'checkout' ? (
-        <div className="figma-card p-6 sm:p-8 max-w-lg mx-auto shadow-2xl">
-          <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#f1edf9]">
-            <button
-              type="button"
-              onClick={() => setStep('plans')}
-              className="flex items-center gap-1.5 text-xs font-bold text-[#6c5ce7] hover:opacity-80 transition-opacity cursor-pointer"
-            >
-              <ArrowLeft size={16} />
-              <span>Back to Plans</span>
-            </button>
-            <div className="flex items-center gap-1.5 text-xs text-[#6c5ce7] font-mono font-bold">
-              <Shield size={14} />
-              <span>Polar.sh Checkout</span>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-[#ede9fe] border border-[#ddd6fe] mb-6 flex items-center justify-between">
-            <div>
-              <p className="text-[10px] text-[#6c5ce7] uppercase font-bold tracking-wider font-mono">
-                Plan Selected
-              </p>
-              <h4 className="text-base font-bold text-[#1f2430] mt-0.5">
-                BudgetDaily Pro ({currentPlan.name})
-              </h4>
-              <p className="text-[11px] text-[#64748b]">{currentPlan.billing}</p>
-            </div>
-            <div className="text-right font-mono">
-              <span className="text-2xl font-bold text-[#6c5ce7]">{currentPlan.price}</span>
-              <span className="text-xs text-[#64748b] block">{currentPlan.period}</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleProcessPayment} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-[#64748b] mb-1.5">
-                Cardholder Name
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Hamza Magsi"
-                value={cardName}
-                onChange={(e) => setCardName(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl bg-[#f8f6ff] border border-[#e8e4f5] text-xs text-[#1f2430] outline-none focus:border-[#6c5ce7]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#64748b] mb-1.5">
-                Card Number
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  required
-                  inputMode="numeric"
-                  placeholder="4242 4242 4242 4242"
-                  value={cardNumber}
-                  onChange={handleCardNumberChange}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#f8f6ff] border border-[#e8e4f5] text-xs text-[#1f2430] outline-none focus:border-[#6c5ce7] font-mono tracking-wider"
-                />
-                <CreditCard size={16} className="absolute left-3.5 top-3 text-[#94a3b8]" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-[#64748b] mb-1.5">
-                  Expiration (MM/YY)
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    inputMode="numeric"
-                    placeholder="12/28"
-                    value={cardExpiry}
-                    onChange={handleExpiryChange}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[#f8f6ff] border border-[#e8e4f5] text-xs text-[#1f2430] outline-none focus:border-[#6c5ce7] font-mono"
-                  />
-                  <Calendar size={14} className="absolute left-3 top-3 text-[#94a3b8]" />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#64748b] mb-1.5">
-                  Security Code (CVC)
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    inputMode="numeric"
-                    maxLength={4}
-                    placeholder="123"
-                    value={cardCvc}
-                    onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, ''))}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[#f8f6ff] border border-[#e8e4f5] text-xs text-[#1f2430] outline-none focus:border-[#6c5ce7] font-mono"
-                  />
-                  <Key size={14} className="absolute left-3 top-3 text-[#94a3b8]" />
-                </div>
-              </div>
-            </div>
-
-            {error && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-600 flex items-center gap-2">
-                <AlertCircle size={14} className="shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-900 font-bold text-sm hover:brightness-105 active:scale-[0.99] transition-all shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-2"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 size={18} className="animate-spin" />
-                  <span>Processing Payment via Polar.sh…</span>
-                </span>
-              ) : (
-                <>
-                  <Lock size={16} />
-                  <span>Complete {currentPlan.price} Payment</span>
-                </>
-              )}
-            </button>
-          </form>
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {/* PRICING PLANS GRID */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {PRICING_PLANS.map((plan) => {
-              const isSelected = selectedPlan === plan.id
-              return (
-                <div
-                  key={plan.id}
-                  onClick={() => {
-                    setSelectedPlan(plan.id)
-                    setError('')
-                  }}
-                  className={`relative p-5 rounded-3xl border cursor-pointer transition-all flex flex-col justify-between ${
-                    isSelected
-                      ? 'bg-[#ede9fe] border-2 border-[#6c5ce7] shadow-xl shadow-[#6c5ce7]/15 scale-[1.03]'
-                      : 'bg-white border-[#e8e4f5] hover:border-slate-300'
-                  }`}
-                >
-                  {plan.badge && (
-                    <span
-                      className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mb-3 self-start ${
-                        isSelected
-                          ? 'bg-[#6c5ce7] text-white'
-                          : 'bg-[#e2e8f0] text-[#64748b]'
-                      }`}
-                    >
-                      {plan.badge}
-                    </span>
-                  )}
-                  <div>
-                    <h3 className="text-sm font-bold text-[#1f2430]">{plan.name}</h3>
-                    <div className="flex items-baseline gap-1 my-2">
-                      <span className={`text-3xl font-extrabold font-mono ${isSelected ? 'text-[#6c5ce7]' : 'text-[#1f2430]'}`}>
-                        {plan.price}
-                      </span>
-                      <span className="text-xs text-[#64748b]">{plan.period}</span>
-                    </div>
-                    <p className="text-xs text-[#64748b] leading-relaxed">
-                      {plan.billing}
-                    </p>
-                  </div>
-
-                  <div className="pt-5 mt-4 border-t border-[#f1edf9]">
-                    <button
-                      type="button"
-                      className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#6c5ce7] text-white'
-                          : 'bg-[#f8f6ff] text-[#64748b] hover:text-[#1f2430]'
-                      }`}
-                    >
-                      {isSelected ? 'Selected' : 'Choose Plan'}
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* FEATURE COMPARISON TABLE */}
-          <div className="figma-card p-6 sm:p-8">
-            <h3 className="font-display text-lg font-bold text-[#1f2430] mb-4 text-center sm:text-left">
-              4 Free Features vs 10 Pro Superpowers
-            </h3>
-
-            <div className="grid sm:grid-cols-2 gap-6">
-              {/* Free features */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 pb-2 border-b border-[#e8e4f5]">
-                  <span className="text-xs font-bold uppercase text-[#64748b]">
-                    Free Starter Plan ($0)
+      <div className="space-y-8">
+        {/* PRICING PLANS GRID */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {PRICING_PLANS.map((plan) => {
+            const isSelected = selectedPlan === plan.id
+            return (
+              <div
+                key={plan.id}
+                onClick={() => setSelectedPlan(plan.id)}
+                className={`relative p-5 rounded-3xl border cursor-pointer transition-all flex flex-col justify-between ${
+                  isSelected
+                    ? 'bg-[#ede9fe] border-2 border-[#6c5ce7] shadow-xl shadow-[#6c5ce7]/15 scale-[1.03]'
+                    : 'bg-white border-[#e8e4f5] hover:border-slate-300'
+                }`}
+              >
+                {plan.badge && (
+                  <span
+                    className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mb-3 self-start ${
+                      isSelected
+                        ? 'bg-[#6c5ce7] text-white'
+                        : 'bg-[#e2e8f0] text-[#64748b]'
+                    }`}
+                  >
+                    {plan.badge}
                   </span>
+                )}
+                <div>
+                  <h3 className="text-sm font-bold text-[#1f2430]">{plan.name}</h3>
+                  <div className="flex items-baseline gap-1 my-2">
+                    <span className={`text-3xl font-extrabold font-mono ${isSelected ? 'text-[#6c5ce7]' : 'text-[#1f2430]'}`}>
+                      {plan.price}
+                    </span>
+                    <span className="text-xs text-[#64748b]">{plan.period}</span>
+                  </div>
+                  <p className="text-xs text-[#64748b] leading-relaxed">
+                    {plan.billing}
+                  </p>
                 </div>
-                {FREE_FEATURES.map((feat) => (
-                  <div key={feat.id} className="flex items-start gap-2.5 text-xs text-[#334155]">
-                    <Check size={15} className="text-[#10b981] mt-0.5 shrink-0" />
+
+                <div className="pt-5 mt-4 border-t border-[#f1edf9]">
+                  <button
+                    type="button"
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#6c5ce7] text-white'
+                        : 'bg-[#f8f6ff] text-[#64748b] hover:text-[#1f2430]'
+                    }`}
+                  >
+                    {isSelected ? 'Selected' : 'Choose Plan'}
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* FEATURE COMPARISON TABLE */}
+        <div className="figma-card p-6 sm:p-8">
+          <h3 className="font-display text-lg font-bold text-[#1f2430] mb-4 text-center sm:text-left">
+            4 Free Features vs 10 Pro Superpowers
+          </h3>
+
+          <div className="grid sm:grid-cols-2 gap-6">
+            {/* Free features */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 pb-2 border-b border-[#e8e4f5]">
+                <span className="text-xs font-bold uppercase text-[#64748b]">
+                  Free Starter Plan ($0)
+                </span>
+              </div>
+              {FREE_FEATURES.map((feat) => (
+                <div key={feat.id} className="flex items-start gap-2.5 text-xs text-[#334155]">
+                  <Check size={15} className="text-[#10b981] mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-semibold text-[#1f2430]">{feat.name}</p>
+                    <p className="text-[11px] text-[#64748b]">{feat.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 10 Pro Features */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 pb-2 border-b border-[#bbf7d0]">
+                <Crown size={14} className="text-[#16a34a]" />
+                <span className="text-xs font-bold uppercase text-[#16a34a]">
+                  Pro Member (All 10 Superpowers)
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-2.5 max-h-72 overflow-y-auto pr-1">
+                {PREMIUM_FEATURES.map((feat) => (
+                  <div key={feat.id} className="flex items-start gap-2.5 text-xs">
+                    <div className="w-4 h-4 rounded-full bg-[#dcfce7] flex items-center justify-center shrink-0 mt-0.5">
+                      <Check size={11} className="text-[#16a34a]" />
+                    </div>
                     <div>
-                      <p className="font-semibold text-[#1f2430]">{feat.name}</p>
+                      <p className="font-bold text-[#1f2430]">{feat.name}</p>
                       <p className="text-[11px] text-[#64748b]">{feat.desc}</p>
                     </div>
                   </div>
                 ))}
               </div>
-
-              {/* 10 Pro Features */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 pb-2 border-b border-[#bbf7d0]">
-                  <Crown size={14} className="text-[#16a34a]" />
-                  <span className="text-xs font-bold uppercase text-[#16a34a]">
-                    Pro Member (All 10 Superpowers)
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 gap-2.5 max-h-72 overflow-y-auto pr-1">
-                  {PREMIUM_FEATURES.map((feat) => (
-                    <div key={feat.id} className="flex items-start gap-2.5 text-xs">
-                      <div className="w-4 h-4 rounded-full bg-[#dcfce7] flex items-center justify-center shrink-0 mt-0.5">
-                        <Check size={11} className="text-[#16a34a]" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-[#1f2430]">{feat.name}</p>
-                        <p className="text-[11px] text-[#64748b]">{feat.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* UPGRADE BUTTON */}
-            <div className="mt-8 pt-6 border-t border-[#e8e4f5] flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3 text-xs text-[#64748b]">
-                <Shield size={16} className="text-[#10b981] shrink-0" />
-                <span>Powered by Polar.sh. Instant checkout & cancel anytime.</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleStartCheckout}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-900 font-bold text-sm hover:brightness-105 active:scale-95 shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Zap size={16} fill="currentColor" />
-                <span>
-                  Pay {currentPlan.price} with Polar
-                </span>
-                <ExternalLink size={14} className="ml-1 opacity-80" />
-              </button>
             </div>
           </div>
+
+          {/* REAL POLAR CHECKOUT BUTTON */}
+          <div className="mt-8 pt-6 border-t border-[#e8e4f5] flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 text-xs text-[#64748b]">
+              <Shield size={16} className="text-[#10b981] shrink-0" />
+              <span>Powered by Polar.sh. Official PCI-compliant checkout.</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSubscribe}
+              disabled={loading}
+              className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-900 font-bold text-sm hover:brightness-105 active:scale-95 shadow-xl shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Connecting to Polar.sh…</span>
+                </span>
+              ) : (
+                <>
+                  <Zap size={16} fill="currentColor" />
+                  <span>
+                    Pay {currentPlan.price} with Polar.sh
+                  </span>
+                  <ExternalLink size={14} className="ml-1 opacity-80" />
+                </>
+              )}
+            </button>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }

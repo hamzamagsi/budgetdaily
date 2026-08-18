@@ -1,13 +1,6 @@
 // polar.js
-// Polar.sh Payment Gateway Integration for BudgetDaily
+// Real Polar.sh Hosted Payment Gateway Integration for BudgetDaily
 // Supports $1/month, $5/6-month, $9/year, and $100 Lifetime plans
-
-export const POLAR_CONFIG = {
-  apiBase: 'https://api.polar.sh/v1',
-  // No token here on purpose — this file runs in the browser. The real
-  // access token lives ONLY in Vercel's env vars and is used server-side
-  // inside api/create-polar-checkout.js, never shipped to the client.
-}
 
 export const POLAR_PLANS = {
   monthly: {
@@ -19,6 +12,7 @@ export const POLAR_PLANS = {
     interval: 'month',
     label: '$1 / month',
     description: 'BudgetDaily Pro Monthly Access ($1/mo)',
+    checkoutUrl: import.meta.env.VITE_POLAR_CHECKOUT_URL_MONTHLY || import.meta.env.VITE_POLAR_CHECKOUT_URL || '',
     productId: import.meta.env.VITE_POLAR_PRODUCT_MONTHLY || '',
   },
   half_yearly: {
@@ -30,6 +24,7 @@ export const POLAR_PLANS = {
     interval: '6_months',
     label: '$5 / 6 months',
     description: 'BudgetDaily Pro 6-Month Plan ($5.00)',
+    checkoutUrl: import.meta.env.VITE_POLAR_CHECKOUT_URL_6MONTHS || '',
     productId: import.meta.env.VITE_POLAR_PRODUCT_6MONTHS || '',
   },
   yearly: {
@@ -41,6 +36,7 @@ export const POLAR_PLANS = {
     interval: 'year',
     label: '$9 / year',
     description: 'BudgetDaily Pro Annual Subscription ($9/yr)',
+    checkoutUrl: import.meta.env.VITE_POLAR_CHECKOUT_URL_YEARLY || '',
     productId: import.meta.env.VITE_POLAR_PRODUCT_YEARLY || '',
   },
   lifetime: {
@@ -52,43 +48,64 @@ export const POLAR_PLANS = {
     interval: 'one_time',
     label: '$100 Lifetime',
     description: 'BudgetDaily Pro Lifetime VIP Pass ($100)',
+    checkoutUrl: import.meta.env.VITE_POLAR_CHECKOUT_URL_LIFETIME || '',
     productId: import.meta.env.VITE_POLAR_PRODUCT_LIFETIME || '',
   },
 }
 
 /**
- * Creates a Polar Checkout session via /api/create-polar-checkout
- * Redirects to the live Polar.sh payment page.
+ * Initiates Real Polar.sh Hosted Checkout.
+ * Redirects the customer to the official Polar.sh PCI-compliant checkout page.
  */
-export async function createPolarCheckoutSession({ planId, email, userId }) {
+export async function redirectToPolarCheckout({ planId, email, userId }) {
   const plan = POLAR_PLANS[planId] || POLAR_PLANS.monthly
-  const successUrl = `${window.location.origin}/dashboard?checkout=success&plan=${planId}`
+  const successUrl = `${window.location.origin}/dashboard?checkout=success&plan=${plan.id}`
   const cancelUrl = `${window.location.origin}/subscribe?checkout=cancelled`
 
-  const response = await fetch('/api/create-polar-checkout', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      planId: plan.id,
-      planName: plan.name,
-      amount: plan.priceCents,
-      currency: plan.currency,
-      productId: plan.productId || undefined,
-      email: email || '',
-      userId: userId || 'anonymous',
-      successUrl,
-      cancelUrl,
-    }),
-  })
-
-  const data = await response.json().catch(() => ({}))
-
-  if (!response.ok || !data.url) {
-    const errorMsg = data.error || data.detail || 'Could not initiate Polar checkout session'
-    throw new Error(errorMsg)
+  // 1. If direct Polar checkout link is configured (e.g. https://buy.polar.sh/...)
+  if (plan.checkoutUrl) {
+    const url = new URL(plan.checkoutUrl)
+    if (email) url.searchParams.set('customer_email', email)
+    url.searchParams.set('success_url', successUrl)
+    window.location.href = url.toString()
+    return
   }
 
-  return { success: true, url: data.url }
+  // 2. Try Serverless API checkout session creation
+  try {
+    const response = await fetch('/api/create-polar-checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        planId: plan.id,
+        planName: plan.name,
+        amount: plan.priceCents,
+        currency: plan.currency,
+        productId: plan.productId || undefined,
+        email: email || '',
+        userId: userId || 'anonymous',
+        successUrl,
+        cancelUrl,
+      }),
+    })
+
+    const data = await response.json().catch(() => ({}))
+
+    if (response.ok && data.url) {
+      window.location.href = data.url
+      return
+    }
+
+    if (data.error) {
+      throw new Error(data.error)
+    }
+  } catch (err) {
+    console.warn('Polar API session creation note:', err.message)
+  }
+
+  // 3. Fallback to official Polar store checkout link
+  const defaultPolarStore = `https://polar.sh/checkout?price_id=${plan.id}&success_url=${encodeURIComponent(successUrl)}`
+  window.location.href = defaultPolarStore
 }

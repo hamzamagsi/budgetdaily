@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { store } from '../lib/store'
+import confetti from 'canvas-confetti'
 import Navbar from '../components/Navbar'
 import BottomNav from '../components/BottomNav'
 import CalendarView from '../components/CalendarView'
@@ -22,7 +23,7 @@ import {
 } from 'lucide-react'
 
 export default function Dashboard() {
-  const { user, isPro } = useAuth()
+  const { user, isPro, upgradePlan } = useAuth()
   const navigate = useNavigate()
 
   const [summary, setSummary] = useState(store.getFinancialSummary())
@@ -44,6 +45,25 @@ export default function Dashboard() {
     setCategories(store.getCategories())
     setActiveAccount(store.getActiveAccount())
   }
+
+  // Listen for real Polar checkout success redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('checkout') === 'success') {
+      const plan = params.get('plan') || 'monthly'
+      upgradePlan(plan)
+      try {
+        confetti({
+          particleCount: 150,
+          spread: 90,
+          origin: { y: 0.6 },
+          colors: ['#6c5ce7', '#10b981', '#f59e0b'],
+        })
+      } catch (err) {}
+      window.history.replaceState({}, document.title, window.location.pathname)
+      refreshData()
+    }
+  }, [])
 
   useEffect(() => {
     refreshData()
