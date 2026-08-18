@@ -1,6 +1,6 @@
 // polar.js
 // Real Polar.sh Payment Gateway Integration for BudgetDaily
-// Configured with exact Polar Product IDs and Checkout Links
+// Connected with live Polar Checkout Link
 
 export const POLAR_PLANS = {
   monthly: {
@@ -15,7 +15,7 @@ export const POLAR_PLANS = {
       import.meta.env.VITE_POLAR_CHECKOUT_URL_MONTHLY ||
       import.meta.env.VITE_POLAR_CHECKOUT_URL_1MONTH ||
       import.meta.env.VITE_POLAR_CHECKOUT_URL ||
-      '',
+      'https://buy.polar.sh/polar_cl_Hrfv8CKqCWF4iI3yPwNQe9uEg1YPwNWw129881w9NSS',
   },
   half_yearly: {
     id: 'half_yearly',
@@ -28,8 +28,7 @@ export const POLAR_PLANS = {
     checkoutUrl:
       import.meta.env.VITE_POLAR_CHECKOUT_URL_6MONTHS ||
       import.meta.env.VITE_POLAR_CHECKOUT_URL_6MONTH ||
-      import.meta.env.VITE_POLAR_CHECKOUT_URL ||
-      '',
+      'https://buy.polar.sh/polar_cl_Hrfv8CKqCWF4iI3yPwNQe9uEg1YPwNWw129881w9NSS',
   },
   yearly: {
     id: 'yearly',
@@ -42,8 +41,7 @@ export const POLAR_PLANS = {
     checkoutUrl:
       import.meta.env.VITE_POLAR_CHECKOUT_URL_YEARLY ||
       import.meta.env.VITE_POLAR_CHECKOUT_URL_1YEAR ||
-      import.meta.env.VITE_POLAR_CHECKOUT_URL ||
-      '',
+      'https://buy.polar.sh/polar_cl_Hrfv8CKqCWF4iI3yPwNQe9uEg1YPwNWw129881w9NSS',
   },
   lifetime: {
     id: 'lifetime',
@@ -55,8 +53,7 @@ export const POLAR_PLANS = {
     productId: '0a1ba203-23e5-450a-a6ef-8c03f60bc260',
     checkoutUrl:
       import.meta.env.VITE_POLAR_CHECKOUT_URL_LIFETIME ||
-      import.meta.env.VITE_POLAR_CHECKOUT_URL ||
-      '',
+      'https://buy.polar.sh/polar_cl_Hrfv8CKqCWF4iI3yPwNQe9uEg1YPwNWw129881w9NSS',
   },
 }
 
@@ -69,52 +66,15 @@ export async function redirectToPolarCheckout({ planId, email, userId }) {
   const successUrl = `${window.location.origin}/dashboard?checkout=success&plan=${plan.id}`
   const cancelUrl = `${window.location.origin}/subscribe?checkout=cancelled`
 
-  // 1. If direct Polar checkout link is configured
-  if (plan.checkoutUrl && !plan.checkoutUrl.includes('example.com')) {
-    try {
-      const url = new URL(plan.checkoutUrl)
-      if (email) url.searchParams.set('customer_email', email)
-      url.searchParams.set('success_url', successUrl)
-      window.location.href = url.toString()
-      return
-    } catch {
-      window.location.href = plan.checkoutUrl
-      return
-    }
-  }
+  let targetUrl = plan.checkoutUrl || 'https://buy.polar.sh/polar_cl_Hrfv8CKqCWF4iI3yPwNQe9uEg1YPwNWw129881w9NSS'
 
-  // 2. Try Serverless API checkout session creation
   try {
-    const response = await fetch('/api/create-polar-checkout', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        productId: plan.productId,
-        planId: plan.id,
-        planName: plan.name,
-        email: email || '',
-        userId: userId || 'anonymous',
-        successUrl,
-        cancelUrl,
-      }),
-    })
-
-    const data = await response.json().catch(() => ({}))
-
-    if (response.ok && data.url) {
-      window.location.href = data.url
-      return
-    }
-  } catch (err) {
-    console.warn('Polar API session note:', err)
+    const url = new URL(targetUrl)
+    if (email) url.searchParams.set('customer_email', email)
+    url.searchParams.set('success_url', successUrl)
+    url.searchParams.set('return_url', cancelUrl)
+    window.location.href = url.toString()
+  } catch {
+    window.location.href = targetUrl
   }
-
-  // 3. If direct link or API session isn't available yet
-  alert(
-    'Please copy the Checkout Link for ' +
-      plan.name +
-      ' from your Polar.sh Dashboard (under Products or Checkout Links) and paste it here!'
-  )
 }
