@@ -1,55 +1,43 @@
 // polar.js
-// Real Polar.sh Hosted Payment Gateway Integration for BudgetDaily
-// Supports $1/month, $5/6-month, $9/year, and $100 Lifetime plans
+// Real Polar.sh Payment Gateway Integration for BudgetDaily
+// Supports direct Polar Checkout links (https://buy.polar.sh/...) and custom product links
 
 export const POLAR_PLANS = {
   monthly: {
     id: 'monthly',
     name: 'Pro Monthly',
-    price: 1.0,
-    priceCents: 100,
-    currency: 'USD',
-    interval: 'month',
-    label: '$1 / month',
-    description: 'BudgetDaily Pro Monthly Access ($1/mo)',
+    price: '$1',
+    priceNum: 1.0,
+    period: '/ month',
+    billing: 'Billed monthly · cancel anytime',
     checkoutUrl: import.meta.env.VITE_POLAR_CHECKOUT_URL_MONTHLY || import.meta.env.VITE_POLAR_CHECKOUT_URL || '',
-    productId: import.meta.env.VITE_POLAR_PRODUCT_MONTHLY || '',
   },
   half_yearly: {
     id: 'half_yearly',
     name: 'Pro 6 Months',
-    price: 5.0,
-    priceCents: 500,
-    currency: 'USD',
-    interval: '6_months',
-    label: '$5 / 6 months',
-    description: 'BudgetDaily Pro 6-Month Plan ($5.00)',
-    checkoutUrl: import.meta.env.VITE_POLAR_CHECKOUT_URL_6MONTHS || '',
-    productId: import.meta.env.VITE_POLAR_PRODUCT_6MONTHS || '',
+    price: '$5',
+    priceNum: 5.0,
+    period: 'for 6 mo',
+    billing: 'Save $1 upfront · $0.83/mo',
+    checkoutUrl: import.meta.env.VITE_POLAR_CHECKOUT_URL_6MONTHS || import.meta.env.VITE_POLAR_CHECKOUT_URL || '',
   },
   yearly: {
     id: 'yearly',
     name: 'Pro Annual',
-    price: 9.0,
-    priceCents: 900,
-    currency: 'USD',
-    interval: 'year',
-    label: '$9 / year',
-    description: 'BudgetDaily Pro Annual Subscription ($9/yr)',
-    checkoutUrl: import.meta.env.VITE_POLAR_CHECKOUT_URL_YEARLY || '',
-    productId: import.meta.env.VITE_POLAR_PRODUCT_YEARLY || '',
+    price: '$9',
+    priceNum: 9.0,
+    period: '/ year',
+    billing: 'Save 25% · Only $0.75/month',
+    checkoutUrl: import.meta.env.VITE_POLAR_CHECKOUT_URL_YEARLY || import.meta.env.VITE_POLAR_CHECKOUT_URL || '',
   },
   lifetime: {
     id: 'lifetime',
     name: 'Pro Lifetime Access',
-    price: 100.0,
-    priceCents: 10000,
-    currency: 'USD',
-    interval: 'one_time',
-    label: '$100 Lifetime',
-    description: 'BudgetDaily Pro Lifetime VIP Pass ($100)',
-    checkoutUrl: import.meta.env.VITE_POLAR_CHECKOUT_URL_LIFETIME || '',
-    productId: import.meta.env.VITE_POLAR_PRODUCT_LIFETIME || '',
+    price: '$100',
+    priceNum: 100.0,
+    period: 'one-time',
+    billing: 'Pay once, own forever · No renewals',
+    checkoutUrl: import.meta.env.VITE_POLAR_CHECKOUT_URL_LIFETIME || import.meta.env.VITE_POLAR_CHECKOUT_URL || '',
   },
 }
 
@@ -64,11 +52,16 @@ export async function redirectToPolarCheckout({ planId, email, userId }) {
 
   // 1. If direct Polar checkout link is configured (e.g. https://buy.polar.sh/...)
   if (plan.checkoutUrl) {
-    const url = new URL(plan.checkoutUrl)
-    if (email) url.searchParams.set('customer_email', email)
-    url.searchParams.set('success_url', successUrl)
-    window.location.href = url.toString()
-    return
+    try {
+      const url = new URL(plan.checkoutUrl)
+      if (email) url.searchParams.set('customer_email', email)
+      url.searchParams.set('success_url', successUrl)
+      window.location.href = url.toString()
+      return
+    } catch {
+      window.location.href = plan.checkoutUrl
+      return
+    }
   }
 
   // 2. Try Serverless API checkout session creation
@@ -81,9 +74,6 @@ export async function redirectToPolarCheckout({ planId, email, userId }) {
       body: JSON.stringify({
         planId: plan.id,
         planName: plan.name,
-        amount: plan.priceCents,
-        currency: plan.currency,
-        productId: plan.productId || undefined,
         email: email || '',
         userId: userId || 'anonymous',
         successUrl,
@@ -97,15 +87,10 @@ export async function redirectToPolarCheckout({ planId, email, userId }) {
       window.location.href = data.url
       return
     }
-
-    if (data.error) {
-      throw new Error(data.error)
-    }
   } catch (err) {
-    console.warn('Polar API session creation note:', err.message)
+    console.warn('Polar API session note:', err)
   }
 
-  // 3. Fallback to official Polar store checkout link
-  const defaultPolarStore = `https://polar.sh/checkout?price_id=${plan.id}&success_url=${encodeURIComponent(successUrl)}`
-  window.location.href = defaultPolarStore
+  // 3. If no direct link is set yet, guide the user to their Polar product
+  alert('Polar Checkout Link is not configured yet. Please copy your Checkout Link from polar.sh/dashboard/products and set VITE_POLAR_CHECKOUT_URL in Vercel.')
 }
