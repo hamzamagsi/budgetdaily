@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { store } from '../lib/store'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import {
-  initGoogleIdentity,
   triggerGoogleOAuth,
   getGoogleClientId,
 } from '../lib/googleAuth'
+import { redirectToPolarCheckout } from '../lib/polar'
 import {
   Mail,
   Phone,
@@ -34,10 +34,14 @@ const COUNTRY_CODES = [
 
 export default function Login() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { signIn } = useAuth()
 
-  const [authMethod, setAuthMethod] = useState('email') // 'email' | 'phone'
-  const [step, setStep] = useState('input') // 'input' | 'otp'
+  const redirectTarget = searchParams.get('redirect')
+  const planTarget = searchParams.get('plan')
+
+  const [authMethod, setAuthMethod] = useState('email')
+  const [step, setStep] = useState('input')
 
   // Input states
   const [email, setEmail] = useState('')
@@ -54,6 +58,15 @@ export default function Login() {
   const [isSupabaseRealEmail, setIsSupabaseRealEmail] = useState(false)
   const otpInputsRef = useRef([])
 
+  const handlePostAuthRedirect = (userData) => {
+    if (redirectTarget === 'subscribe') {
+      redirectToPolarCheckout({ planId: planTarget || 'monthly', email: userData.email })
+      return
+    }
+    const hasBudget = store.getActiveBudget()
+    navigate(hasBudget ? '/dashboard' : '/onboarding')
+  }
+
   // Check for existing Supabase session on mount
   useEffect(() => {
     async function checkExistingSession() {
@@ -61,15 +74,14 @@ export default function Login() {
         const { data } = await supabase.auth.getSession()
         if (data?.session?.user) {
           const u = data.session.user
-          signIn({
+          const userObj = signIn({
             id: u.id,
             email: u.email,
             name: u.user_metadata?.full_name || u.email?.split('@')[0],
             verified: true,
             method: 'supabase',
           })
-          const hasBudget = store.getActiveBudget()
-          navigate(hasBudget ? '/dashboard' : '/onboarding')
+          handlePostAuthRedirect(userObj)
         }
       }
     }
@@ -230,9 +242,8 @@ export default function Login() {
             method: 'supabase_email',
           }
 
-          signIn(userData)
-          const hasBudget = store.getActiveBudget()
-          navigate(hasBudget ? '/dashboard' : '/onboarding')
+          const userObj = signIn(userData)
+          handlePostAuthRedirect(userObj)
           return
         }
       } catch (err) {
@@ -258,9 +269,8 @@ export default function Login() {
             method: 'phone',
           }
 
-    signIn(userData)
-    const hasBudget = store.getActiveBudget()
-    navigate(hasBudget ? '/dashboard' : '/onboarding')
+    const userObj = signIn(userData)
+    handlePostAuthRedirect(userObj)
   }
 
   // Handle Google Sign-In in ALL browsers
@@ -288,9 +298,8 @@ export default function Login() {
         clientId,
         onSuccess: (verifiedUser) => {
           setLoading(false)
-          signIn(verifiedUser)
-          const hasBudget = store.getActiveBudget()
-          navigate(hasBudget ? '/dashboard' : '/onboarding')
+          const userObj = signIn(verifiedUser)
+          handlePostAuthRedirect(userObj)
         },
         onError: () => demoGoogleSignIn(),
       })
@@ -304,7 +313,7 @@ export default function Login() {
     setTimeout(() => {
       const emailToUse = email.trim() && isValidEmail(email) ? email.trim() : 'hamza.magsi@gmail.com'
       const nameToUse = emailToUse.split('@')[0].replace('.', ' ')
-      signIn({
+      const userObj = signIn({
         id: 'google_' + Date.now(),
         email: emailToUse,
         name: nameToUse.charAt(0).toUpperCase() + nameToUse.slice(1),
@@ -313,8 +322,7 @@ export default function Login() {
         verified: true,
         method: 'google',
       })
-      const hasBudget = store.getActiveBudget()
-      navigate(hasBudget ? '/dashboard' : '/onboarding')
+      handlePostAuthRedirect(userObj)
     }, 400)
   }
 
@@ -549,7 +557,7 @@ export default function Login() {
                 ) : (
                   <>
                     <CheckCircle2 size={16} />
-                    <span>Verify & Enter Dashboard</span>
+                    <span>Verify & Continue</span>
                   </>
                 )}
               </button>

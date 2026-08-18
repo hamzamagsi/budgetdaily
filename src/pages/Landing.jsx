@@ -37,6 +37,14 @@ export default function Landing() {
     }
   }, [user, loading])
 
+  const handlePlanClick = (planId) => {
+    if (user) {
+      redirectToPolarCheckout({ planId, email: user.email })
+    } else {
+      navigate(`/login?redirect=subscribe&plan=${planId}`)
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#f3f0ff] selection:bg-[#ede9fe] selection:text-[#6c5ce7]">
       {/* MINIMAL PASTEL NAVBAR */}
@@ -285,7 +293,7 @@ export default function Landing() {
 
                 <div className="pt-6 mt-4 border-t border-[#f1edf9]">
                   <button
-                    onClick={() => redirectToPolarCheckout({ planId: plan.id })}
+                    onClick={() => handlePlanClick(plan.id)}
                     className="w-full py-3 rounded-2xl bg-[#6c5ce7] hover:bg-[#5849cf] text-white text-xs font-bold shadow-md shadow-[#6c5ce7]/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <Zap size={14} fill="currentColor" />
