@@ -39,10 +39,10 @@ export const DEFAULT_ACCOUNTS = [
 
 export const PLANS = {
   free: { id: 'free', name: 'Free Starter', price: 0, interval: 'forever', isPro: false },
-  monthly: { id: 'monthly', name: 'Pro Monthly', price: 1, interval: '/month', isPro: true, savings: null },
-  half_yearly: { id: 'half_yearly', name: 'Pro 6 Months', price: 5, interval: '/6 months', isPro: true, savings: 'Save $1' },
-  yearly: { id: 'yearly', name: 'Pro Annual', price: 9, interval: '/year', isPro: true, savings: 'Save 25% ($0.75/mo)' },
-  lifetime: { id: 'lifetime', name: 'Pro Lifetime', price: 100, interval: 'one-time', isPro: true, savings: 'Pay once, forever' },
+  monthly: { id: 'monthly', name: 'Pro Monthly', price: 1.99, interval: '/month', isPro: true, savings: null },
+  half_yearly: { id: 'half_yearly', name: 'Pro 6 Months', price: 9.99, interval: '/6 months', isPro: true, savings: 'Save upfront' },
+  yearly: { id: 'yearly', name: 'Pro Annual', price: 19.99, interval: '/year', isPro: true, savings: 'Save 25%' },
+  lifetime: { id: 'lifetime', name: 'Pro Lifetime', price: 100.00, interval: 'one-time', isPro: true, savings: 'Pay once, forever' },
 }
 
 export const localStore = {

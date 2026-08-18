@@ -36,8 +36,8 @@ export const PRICING_PLANS = [
   {
     id: 'monthly',
     name: 'Monthly',
-    price: '$1',
-    priceNum: 1.0,
+    price: '$1.99',
+    priceNum: 1.99,
     period: '/ month',
     billing: 'Billed monthly · cancel anytime',
     badge: 'Most Popular',
@@ -46,20 +46,20 @@ export const PRICING_PLANS = [
   {
     id: 'half_yearly',
     name: '6 Months',
-    price: '$5',
-    priceNum: 5.0,
+    price: '$9.99',
+    priceNum: 9.99,
     period: 'for 6 mo',
-    billing: 'Save $1 upfront · $0.83/mo',
-    badge: 'Save $1',
+    billing: 'Save upfront · $1.66/mo',
+    badge: 'Save 15%',
     popular: false,
   },
   {
     id: 'yearly',
     name: '1 Year (Annual)',
-    price: '$9',
-    priceNum: 9.0,
+    price: '$19.99',
+    priceNum: 19.99,
     period: '/ year',
-    billing: 'Save 25% · Only $0.75/month',
+    billing: 'Save 25% · Only $1.66/month',
     badge: 'Best Value',
     popular: false,
   },
@@ -92,6 +92,7 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
       email: user?.email,
       userId: user?.id,
     })
+    setLoading(false)
   }
 
   return (
@@ -117,7 +118,7 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
               Unlock All 10 Premium Superpowers
             </h2>
             <p className="text-xs sm:text-sm text-[#64748b] mt-1.5 max-w-md mx-auto">
-              Supercharge your finance with unlimited logs, custom icons (like ☕ Tea / Chai), AI insights & detailed analytics for just $1/mo.
+              Supercharge your finance with unlimited logs, custom icons (like ☕ Tea / Chai), AI insights & detailed analytics for just $1.99/mo.
             </p>
           </div>
 
@@ -232,7 +233,7 @@ export default function PremiumModal({ isOpen, onClose, highlightFeature = '' })
               {loading ? (
                 <span className="flex items-center gap-2">
                   <Loader2 size={18} className="animate-spin" />
-                  <span>Redirecting to Polar.sh Checkout…</span>
+                  <span>Connecting to Polar.sh Checkout…</span>
                 </span>
               ) : (
                 <>

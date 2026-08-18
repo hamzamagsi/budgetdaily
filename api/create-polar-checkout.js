@@ -1,42 +1,34 @@
 // Vercel Serverless Function: /api/create-polar-checkout
 // Creates a Polar.sh Checkout Session using Organization Access Token (OAT)
+// Polar API v1: POST https://api.polar.sh/v1/checkouts/
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' })
   }
 
-  const token = process.env.POLAR_ACCESS_TOKEN
-  const { planId, planName, amount, currency = 'USD', productId, email, userId, successUrl, cancelUrl } = req.body || {}
+  const token = process.env.POLAR_ACCESS_TOKEN || 'polar_oat_uURiXVRnxqmxR9K5P5wmzE69WnhJZ3TBTbWYw3p4Zdq'
+  const { productId, planId, email, userId, successUrl, cancelUrl } = req.body || {}
 
-  if (!token) {
-    return res.status(500).json({ error: 'Polar Access Token is missing — set POLAR_ACCESS_TOKEN in your environment variables.' })
+  const origin = req.headers.origin || 'https://budgetdaily.vercel.app'
+  const finalSuccessUrl = successUrl || `${origin}/dashboard?checkout=success&plan=${planId || 'monthly'}`
+
+  if (!productId) {
+    return res.status(400).json({ error: 'Polar Product ID is required' })
   }
 
   try {
-    // Build payload for Polar API checkout
     const bodyPayload = {
+      products: [productId],
       customer_email: email || undefined,
-      success_url: successUrl || `${req.headers.origin || ''}/dashboard?checkout=success`,
-      cancel_url: cancelUrl || `${req.headers.origin || ''}/dashboard?checkout=canceled`,
+      success_url: finalSuccessUrl,
       metadata: {
         userId: userId || 'anonymous',
         planId: planId || undefined,
-        planName: planName || undefined,
       },
     }
 
-    // If a specific Polar product ID is configured, include it.
-    if (productId) {
-      bodyPayload.product_id = productId
-    }
-
-    if (typeof amount !== 'undefined') {
-      bodyPayload.amount = amount
-      bodyPayload.currency = currency
-    }
-
-    const polarRes = await fetch('https://api.polar.sh/v1/checkouts/custom/', {
+    const polarRes = await fetch('https://api.polar.sh/v1/checkouts/', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -46,19 +38,12 @@ export default async function handler(req, res) {
       body: JSON.stringify(bodyPayload),
     })
 
-    let data
-    try {
-      data = await polarRes.json()
-    } catch (parseErr) {
-      console.error('Failed to parse Polar response as JSON', parseErr)
-      return res.status(502).json({ error: 'Invalid response from Polar API' })
-    }
+    const data = await polarRes.json().catch(() => ({}))
 
-    if (!polarRes.ok) {
+    if (!polarRes.ok || !data.url) {
       console.error('Polar API Error:', JSON.stringify(data))
-      return res.status(polarRes.status).json({
-        error:
-          data.error || (Array.isArray(data.detail) ? data.detail[0]?.msg : data.detail) || 'Failed to create Polar checkout session',
+      return res.status(polarRes.status || 500).json({
+        error: data.error || (Array.isArray(data.detail) ? data.detail[0]?.msg : data.detail) || 'Failed to create Polar checkout session',
         details: data,
       })
     }
@@ -66,7 +51,6 @@ export default async function handler(req, res) {
     return res.status(200).json({
       url: data.url,
       checkoutId: data.id,
-      raw: data,
     })
   } catch (err) {
     console.error('Server error creating Polar checkout:', err)
