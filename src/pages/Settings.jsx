@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { store } from '../lib/store'
+import { store, SUPPORTED_CURRENCIES } from '../lib/store'
 import Navbar from '../components/Navbar'
 import BottomNav from '../components/BottomNav'
 import AddTransactionModal from '../components/AddTransactionModal'
@@ -24,6 +24,7 @@ import {
   ExternalLink,
   MessageSquare,
   FileText,
+  Globe,
 } from 'lucide-react'
 
 export default function Settings() {
@@ -33,6 +34,8 @@ export default function Settings() {
   const [accounts, setAccounts] = useState(store.getAccounts())
   const [activeAccount, setActiveAccount] = useState(store.getActiveAccount())
   const [categories, setCategories] = useState(store.getCategories())
+  const [currency, setCurrency] = useState(store.getCurrency() || '$')
+
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isCustomCatOpen, setIsCustomCatOpen] = useState(false)
   const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false)
@@ -42,6 +45,13 @@ export default function Settings() {
     setAccounts(store.getAccounts())
     setActiveAccount(store.getActiveAccount())
     setCategories(store.getCategories())
+    setCurrency(store.getCurrency() || '$')
+  }
+
+  const handleCurrencyChange = (newSymbol) => {
+    setCurrency(newSymbol)
+    store.setCurrency(newSymbol)
+    window.dispatchEvent(new Event('storage_change'))
   }
 
   const handleSignOut = async () => {
@@ -92,14 +102,14 @@ export default function Settings() {
               <h1 className="text-base sm:text-lg font-bold text-[#1f2430]">
                 Settings & Wallets
               </h1>
-              <p className="text-xs text-[#64748b] font-medium">Manage multi-accounts, categories & subscription</p>
+              <p className="text-xs text-[#64748b] font-medium">Manage multi-accounts, currency & subscription</p>
             </div>
           </div>
         </div>
 
         {/* 2-COLUMN GRID ON DESKTOP */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-          {/* LEFT COLUMN: PROFILE & SUBSCRIPTION */}
+          {/* LEFT COLUMN: PROFILE, CURRENCY & SUBSCRIPTION */}
           <div className="space-y-5">
             {/* USER PROFILE CARD */}
             <div className="figma-card p-6 flex items-center justify-between">
@@ -109,13 +119,39 @@ export default function Settings() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-[#1f2430]">{user?.name || 'Hamza Magsi'}</h3>
+                    <h3 className="text-base font-bold text-[#1f2430]">{user?.name || 'User'}</h3>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#dcfce7] text-[#16a34a] font-bold font-mono">
                       Verified
                     </span>
                   </div>
                   <p className="text-xs text-[#64748b]">{user?.email || 'user@budgetdaily.app'}</p>
                 </div>
+              </div>
+            </div>
+
+            {/* CURRENCY PREFERENCE CARD */}
+            <div className="figma-card p-6 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-[#f1edf9]">
+                <div className="flex items-center gap-2">
+                  <Globe size={16} className="text-[#6c5ce7]" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#1f2430]">Display Currency</h4>
+                </div>
+                <span className="text-xs font-bold font-mono text-[#6c5ce7]">{currency}</span>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs text-[#64748b]">Select your preferred currency for the app:</label>
+                <select
+                  value={currency}
+                  onChange={(e) => handleCurrencyChange(e.target.value)}
+                  className="w-full p-3 rounded-2xl bg-[#f8f6ff] border border-[#e8e4f5] text-xs font-bold text-[#1f2430] outline-none focus:border-[#6c5ce7] cursor-pointer"
+                >
+                  {SUPPORTED_CURRENCIES.map((c) => (
+                    <option key={c.code} value={c.symbol}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -271,7 +307,7 @@ export default function Settings() {
                         </div>
                       </div>
                       <span className="text-xs font-bold font-mono text-[#1f2430]">
-                        ${acc.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        {currency}{acc.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                   )

@@ -14,14 +14,15 @@ import {
 } from 'lucide-react'
 
 export default function CalendarView({ onOpenAddTransaction }) {
-  const [currentDate, setCurrentDate] = useState(new Date(2024, 7, 10)) // August 10, 2024 default to match Figma
-  const [selectedDay, setSelectedDay] = useState(10)
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate())
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
 
   const transactions = store.getTransactions()
   const categories = store.getCategories()
   const activeAccount = store.getActiveAccount()
+  const curr = store.getCurrency() || '$'
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -128,7 +129,7 @@ export default function CalendarView({ onOpenAddTransaction }) {
         <div className="animate-in fade-in zoom-in-95">
           <input
             type="text"
-            placeholder="Search transactions by name or note (e.g. Coles, Sushi)..."
+            placeholder="Search transactions by name or note..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full px-3.5 py-2 text-xs rounded-xl bg-[#f8f6ff] border border-[#e8e4f5] outline-none focus:border-[#6c5ce7]"
@@ -179,7 +180,7 @@ export default function CalendarView({ onOpenAddTransaction }) {
                 {day}
               </span>
 
-              {/* Little red spend label under date */}
+              {/* Little spend label under date */}
               {spend ? (
                 <span className="text-[9px] font-mono font-bold text-[#ef4444] leading-tight block truncate max-w-full">
                   {spend >= 1000 ? `${(spend / 1000).toFixed(1)}k` : Math.round(spend)}
@@ -212,19 +213,19 @@ export default function CalendarView({ onOpenAddTransaction }) {
           <div>
             <p className="text-[10px] text-white/70">Expense</p>
             <p className="text-xs sm:text-sm font-bold font-mono text-[#ffa8a8]">
-              ${dayExpense.toFixed(2)}
+              {curr}{dayExpense.toFixed(2)}
             </p>
           </div>
           <div>
             <p className="text-[10px] text-white/70">Income</p>
             <p className="text-xs sm:text-sm font-bold font-mono text-[#86efac]">
-              ${dayIncome.toFixed(2)}
+              {curr}{dayIncome.toFixed(2)}
             </p>
           </div>
           <div>
             <p className="text-[10px] text-white/70">Total</p>
             <p className="text-xs sm:text-sm font-bold font-mono text-white">
-              {dayTotal >= 0 ? `$${dayTotal.toFixed(2)}` : `-$${Math.abs(dayTotal).toFixed(2)}`}
+              {dayTotal >= 0 ? `${curr}${dayTotal.toFixed(2)}` : `-${curr}${Math.abs(dayTotal).toFixed(2)}`}
             </p>
           </div>
         </div>
@@ -265,7 +266,7 @@ export default function CalendarView({ onOpenAddTransaction }) {
 
                 <div className="text-right font-mono font-bold text-xs">
                   <span className={tx.type === 'income' ? 'text-[#16a34a]' : 'text-[#1f2430]'}>
-                    {tx.type === 'income' ? `+$${Number(tx.amount).toFixed(2)}` : `-$${Number(tx.amount).toFixed(2)}`}
+                    {tx.type === 'income' ? `+${curr}${Number(tx.amount).toFixed(2)}` : `-${curr}${Number(tx.amount).toFixed(2)}`}
                   </span>
                 </div>
               </div>

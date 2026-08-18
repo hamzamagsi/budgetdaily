@@ -1,46 +1,58 @@
 // localStore.js
-// Persistent localStorage-backed data layer with user-scoped subscriptions,
-// multi-account wallets, income & expense tracking, and calendar views.
+// Production-grade user-scoped data layer for BudgetDaily.
+// Every new user starts with a clean slate ($0 balance, 0 transactions, empty budget).
+// Supports global multi-currency and strict user-isolated storage.
 
 import { DEFAULT_CATEGORIES } from './categories'
 
-const KEYS = {
-  user: 'bd_user',
-  budgets: 'bd_budgets',
-  transactions: 'bd_transactions',
-  accounts: 'bd_accounts',
-  activeAccount: 'bd_active_account',
-  categoryBudgets: 'bd_category_budgets',
-  subscriptionPrefix: 'bd_sub_',
-  customCategories: 'bd_custom_categories',
-  recurringBills: 'bd_recurring_bills',
-  savingsGoal: 'bd_savings_goal',
+export const SUPPORTED_CURRENCIES = [
+  { symbol: '$', code: 'USD', name: 'US Dollar ($)' },
+  { symbol: '₨', code: 'PKR', name: 'Pakistani Rupee (₨)' },
+  { symbol: '₹', code: 'INR', name: 'Indian Rupee (₹)' },
+  { symbol: '€', code: 'EUR', name: 'Euro (€)' },
+  { symbol: '£', code: 'GBP', name: 'British Pound (£)' },
+  { symbol: 'AED', code: 'AED', name: 'UAE Dirham (AED)' },
+  { symbol: 'SAR', code: 'SAR', name: 'Saudi Riyal (SAR)' },
+  { symbol: 'C$', code: 'CAD', name: 'Canadian Dollar (C$)' },
+  { symbol: 'A$', code: 'AUD', name: 'Australian Dollar (A$)' },
+  { symbol: '¥', code: 'JPY', name: 'Japanese Yen (¥)' },
+  { symbol: '₩', code: 'KRW', name: 'South Korean Won (₩)' },
+  { symbol: '₺', code: 'TRY', name: 'Turkish Lira (₺)' },
+  { symbol: 'R$', code: 'BRL', name: 'Brazilian Real (R$)' },
+]
+
+function getUserEmail() {
+  try {
+    const raw = localStorage.getItem('bd_user')
+    if (raw) {
+      const u = JSON.parse(raw)
+      return u?.email ? u.email.toLowerCase().trim() : 'guest'
+    }
+  } catch {}
+  return 'guest'
 }
 
-function read(key, fallback) {
+function readUser(keySuffix, fallback) {
   try {
-    const raw = localStorage.getItem(key)
+    const email = getUserEmail()
+    const raw = localStorage.getItem(`bd_${email}_${keySuffix}`)
     return raw ? JSON.parse(raw) : fallback
   } catch {
     return fallback
   }
 }
 
-function write(key, value) {
-  localStorage.setItem(key, JSON.stringify(value))
+function writeUser(keySuffix, value) {
+  try {
+    const email = getUserEmail()
+    localStorage.setItem(`bd_${email}_${keySuffix}`, JSON.stringify(value))
+  } catch {}
 }
-
-export const DEFAULT_ACCOUNTS = [
-  { id: 'default', name: 'Default', icon: '👛', color: '#6c5ce7', balance: 2323.56 },
-  { id: 'bank', name: 'Chase Checking', icon: '💳', color: '#3b82f6', balance: 4500.00 },
-  { id: 'cash', name: 'Cash Wallet', icon: '💵', color: '#10b981', balance: 350.00 },
-  { id: 'savings', name: 'High Yield Savings', icon: '🏦', color: '#f59e0b', balance: 12000.00 },
-]
 
 export const PLANS = {
   free: { id: 'free', name: 'Free Starter', price: 0, interval: 'forever', isPro: false },
   monthly: { id: 'monthly', name: 'Pro Monthly', price: 1.99, interval: '/month', isPro: true, savings: null },
-  half_yearly: { id: 'half_yearly', name: 'Pro 6 Months', price: 9.99, interval: '/6 months', isPro: true, savings: 'Save upfront' },
+  half_yearly: { id: 'half_yearly', name: 'Pro 6 Months', price: 9.99, interval: '/6 months', isPro: true, savings: 'Save 15%' },
   yearly: { id: 'yearly', name: 'Pro Annual', price: 19.99, interval: '/year', isPro: true, savings: 'Save 25%' },
   lifetime: { id: 'lifetime', name: 'Pro Lifetime', price: 100.00, interval: 'one-time', isPro: true, savings: 'Pay once, forever' },
 }
@@ -48,27 +60,40 @@ export const PLANS = {
 export const localStore = {
   // --- Auth ---
   getUser() {
-    return read(KEYS.user, null)
+    try {
+      const raw = localStorage.getItem('bd_user')
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
   },
   signIn(userData) {
     const user = typeof userData === 'string'
       ? { id: 'user-' + Date.now(), email: userData, verified: true, method: 'email' }
       : { id: userData.id || 'user-' + Date.now(), verified: true, ...userData }
-    write(KEYS.user, user)
+    localStorage.setItem('bd_user', JSON.stringify(user))
     return user
   },
   signOut() {
-    localStorage.removeItem(KEYS.user)
+    localStorage.removeItem('bd_user')
   },
 
-  // --- Subscriptions (Scoped per user so new logins start on FREE plan) ---
-  getUserSubKey() {
-    const u = this.getUser()
-    return u?.email ? `${KEYS.subscriptionPrefix}${u.email.toLowerCase()}` : `${KEYS.subscriptionPrefix}anon`
+  // --- Currency (User Configured) ---
+  getCurrency() {
+    const budget = this.getActiveBudget()
+    return budget?.currency || readUser('currency', '$')
   },
+  setCurrency(symbol) {
+    writeUser('currency', symbol)
+    const active = this.getActiveBudget()
+    if (active) {
+      this.updateBudget({ currency: symbol })
+    }
+  },
+
+  // --- Subscriptions (Strictly Free by Default for all accounts) ---
   getSubscription() {
-    const subKey = this.getUserSubKey()
-    return read(subKey, {
+    return readUser('subscription', {
       status: 'active',
       plan: 'free',
       isPro: false,
@@ -76,7 +101,6 @@ export const localStore = {
     })
   },
   setSubscription(sub) {
-    const subKey = this.getUserSubKey()
     const planInfo = PLANS[sub.plan] || PLANS.free
     const updated = {
       ...sub,
@@ -85,7 +109,7 @@ export const localStore = {
       planName: planInfo.name,
       updatedAt: new Date().toISOString(),
     }
-    write(subKey, updated)
+    writeUser('subscription', updated)
     return updated
   },
   isProUser() {
@@ -93,15 +117,24 @@ export const localStore = {
     return !!sub.isPro
   },
 
-  // --- Accounts / Wallets ---
+  // --- Accounts / Wallets (Scoped to User) ---
   getAccounts() {
-    return read(KEYS.accounts, DEFAULT_ACCOUNTS)
+    const fallback = [
+      { id: 'default', name: 'Default Wallet', icon: '👛', color: '#6c5ce7', balance: 0.00 },
+      { id: 'bank', name: 'Main Checking', icon: '💳', color: '#3b82f6', balance: 0.00 },
+      { id: 'cash', name: 'Cash Wallet', icon: '💵', color: '#10b981', balance: 0.00 },
+      { id: 'savings', name: 'Savings Fund', icon: '🏦', color: '#f59e0b', balance: 0.00 },
+    ]
+    return readUser('accounts', fallback)
+  },
+  setAccounts(accounts) {
+    writeUser('accounts', accounts)
   },
   getActiveAccountId() {
-    return read(KEYS.activeAccount, 'default')
+    return readUser('active_account_id', 'default')
   },
   setActiveAccountId(id) {
-    write(KEYS.activeAccount, id)
+    writeUser('active_account_id', id)
   },
   getActiveAccount() {
     const accounts = this.getAccounts()
@@ -109,135 +142,63 @@ export const localStore = {
     return accounts.find((a) => a.id === activeId) || accounts[0]
   },
 
-  // --- Budgets ---
+  // --- Budgets (User Scoped - null for brand new users until onboarded) ---
   getActiveBudget() {
-    const budgets = read(KEYS.budgets, [])
-    const active = budgets.find((b) => b.active)
-    if (active) return active
-
-    const defaultBudget = {
-      id: 'budget-aug-2024',
-      name: 'August Budget',
-      periodLabel: 'August · 01 Aug - 31 Aug',
-      totalAmount: 4500.00,
-      periodDays: 31,
-      mode: 'budget', // 'budget' | 'goal'
+    const budget = readUser('active_budget', null)
+    return budget
+  },
+  createBudget(budgetData) {
+    const newBudget = {
+      id: 'budget-' + Date.now(),
+      name: budgetData.name || 'My Budget',
+      periodLabel: budgetData.periodLabel || 'Current Period',
+      totalAmount: Number(budgetData.totalAmount) || 0,
+      periodDays: Number(budgetData.periodDays) || 30,
+      startDate: budgetData.startDate || new Date().toISOString().slice(0, 10),
+      endDate: budgetData.endDate || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+      currency: budgetData.currency || '$',
+      mode: budgetData.mode || 'budget',
       categoryBudgetEnabled: true,
       active: true,
       createdAt: new Date().toISOString(),
     }
-    write(KEYS.budgets, [defaultBudget])
-    return defaultBudget
+    writeUser('active_budget', newBudget)
+    return newBudget
   },
   updateBudget(budgetData) {
-    const budgets = read(KEYS.budgets, [])
     const active = this.getActiveBudget()
+    if (!active) {
+      return this.createBudget(budgetData)
+    }
     const updated = { ...active, ...budgetData }
-    const filtered = budgets.filter((b) => b.id !== active.id)
-    write(KEYS.budgets, [...filtered, updated])
+    writeUser('active_budget', updated)
     return updated
   },
 
   // --- Category Budgets ---
   getCategoryBudgets() {
-    return read(KEYS.categoryBudgets, {
-      rent: 1700,
-      healthcare: 200,
-      dining: 250,
-      entertainment: 200,
-      groceries: 500,
-      tea: 50,
-      transport: 150,
-      shopping: 150,
-      bills: 100,
+    return readUser('category_budgets', {
+      rent: 0,
+      healthcare: 0,
+      dining: 0,
+      entertainment: 0,
+      groceries: 0,
+      transport: 0,
+      shopping: 0,
+      bills: 0,
     })
   },
   setCategoryBudget(categoryId, amount) {
     const current = this.getCategoryBudgets()
     const updated = { ...current, [categoryId]: Number(amount) || 0 }
-    write(KEYS.categoryBudgets, updated)
+    writeUser('category_budgets', updated)
     return updated
   },
 
-  // --- Transactions (Expenses & Incomes) ---
+  // --- Transactions (Expenses & Incomes - 100% user-scoped and clean) ---
   getTransactions() {
-    const txs = read(KEYS.transactions, null)
-    if (txs) return txs
-
-    // Rich sample data from Figma screen
-    const now = new Date()
-    const y = now.getFullYear()
-    const m = now.getMonth()
-
-    const initialTxs = [
-      {
-        id: 'tx-1',
-        type: 'expense',
-        amount: 40.72,
-        categoryId: 'groceries',
-        note: 'Coles',
-        date: new Date(y, m, 10, 12, 35).toISOString(),
-        accountId: 'default',
-      },
-      {
-        id: 'tx-2',
-        type: 'expense',
-        amount: 32.66,
-        categoryId: 'dining',
-        note: 'Bakery',
-        date: new Date(y, m, 10, 20, 0).toISOString(),
-        accountId: 'default',
-      },
-      {
-        id: 'tx-3',
-        type: 'expense',
-        amount: 1700.00,
-        categoryId: 'rent',
-        note: 'Rent',
-        date: new Date(y, m, 1, 9, 0).toISOString(),
-        accountId: 'default',
-      },
-      {
-        id: 'tx-4',
-        type: 'expense',
-        amount: 126.15,
-        categoryId: 'healthcare',
-        note: 'Healthcare prescription',
-        date: new Date(y, m, 5, 14, 20).toISOString(),
-        accountId: 'default',
-      },
-      {
-        id: 'tx-5',
-        type: 'expense',
-        amount: 12.00,
-        categoryId: 'dining',
-        note: 'Sushi',
-        date: new Date(y, m, 7, 13, 10).toISOString(),
-        accountId: 'default',
-      },
-      {
-        id: 'tx-6',
-        type: 'expense',
-        amount: 86.40,
-        categoryId: 'shopping',
-        note: 'Shopping',
-        date: new Date(y, m, 9, 16, 45).toISOString(),
-        accountId: 'default',
-      },
-      {
-        id: 'tx-income-1',
-        type: 'income',
-        amount: 4500.00,
-        categoryId: 'salary',
-        note: 'Monthly Salary',
-        date: new Date(y, m, 1, 10, 0).toISOString(),
-        accountId: 'default',
-      },
-    ]
-    write(KEYS.transactions, initialTxs)
-    return initialTxs
+    return readUser('transactions', [])
   },
-
   getExpenses() {
     return this.getTransactions().filter((t) => t.type === 'expense')
   },
@@ -245,13 +206,12 @@ export const localStore = {
     const today = new Date().toISOString().slice(0, 10)
     return this.getExpenses().filter((e) => e.date && e.date.slice(0, 10) === today)
   },
-
   addTransaction(tx) {
     const txs = this.getTransactions()
     const isPro = this.isProUser()
     const todayTxs = this.getTodayExpenses()
 
-    // Free limit check: max 5 expenses per day
+    // Free tier daily limit check
     if (tx.type === 'expense' && !isPro && todayTxs.length >= 5) {
       const error = new Error('FREE_LIMIT_REACHED')
       error.limit = 5
@@ -269,17 +229,35 @@ export const localStore = {
       recurring: !!tx.recurring,
     }
 
-    write(KEYS.transactions, [newTx, ...txs])
+    const updated = [newTx, ...txs]
+    writeUser('transactions', updated)
+
+    // Update wallet balance
+    const accounts = this.getAccounts()
+    const activeAccId = newTx.accountId
+    const updatedAccounts = accounts.map((acc) => {
+      if (acc.id === activeAccId) {
+        const delta = newTx.type === 'income' ? newTx.amount : -newTx.amount
+        return { ...acc, balance: Math.max(0, acc.balance + delta) }
+      }
+      return acc
+    })
+    this.setAccounts(updatedAccounts)
+
     return newTx
   },
   deleteTransaction(id) {
     const txs = this.getTransactions()
-    write(KEYS.transactions, txs.filter((t) => t.id !== id))
+    const filtered = txs.filter((t) => t.id !== id)
+    writeUser('transactions', filtered)
   },
 
-  // --- Financial Aggregates ---
+  // --- Financial Summary ---
   getFinancialSummary() {
     const txs = this.getTransactions()
+    const budget = this.getActiveBudget()
+    const budgetTotal = budget?.totalAmount || 0
+
     const totalIncome = txs
       .filter((t) => t.type === 'income')
       .reduce((sum, t) => sum + Number(t.amount || 0), 0)
@@ -288,26 +266,28 @@ export const localStore = {
       .filter((t) => t.type === 'expense')
       .reduce((sum, t) => sum + Number(t.amount || 0), 0)
 
-    const budget = this.getActiveBudget()
-    const budgetTotal = budget?.totalAmount || 4500
     const leftToSpend = Math.max(0, budgetTotal - totalExpense)
+    const days = budget?.periodDays || 30
+    const safeDaily = days > 0 ? leftToSpend / days : 0
 
     return {
-      income: totalIncome || 4500.00,
+      income: totalIncome,
       expense: totalExpense,
-      balance: Math.max(0, (totalIncome || 4500.00) - totalExpense),
+      balance: Math.max(0, totalIncome - totalExpense),
       leftToSpend,
       budgetTotal,
+      safeDaily,
+      currency: budget?.currency || '$',
     }
   },
 
-  // --- Categories (Default + Custom) ---
+  // --- Categories ---
   getCategories() {
-    const custom = read(KEYS.customCategories, [])
+    const custom = readUser('custom_categories', [])
     return [...DEFAULT_CATEGORIES, ...custom]
   },
   addCustomCategory(category) {
-    const custom = read(KEYS.customCategories, [])
+    const custom = readUser('custom_categories', [])
     const newCat = {
       id: 'custom-' + Date.now(),
       name: category.name,
@@ -316,16 +296,26 @@ export const localStore = {
       budget: Number(category.budget) || 100,
       isCustom: true,
     }
-    write(KEYS.customCategories, [...custom, newCat])
+    const updated = [...custom, newCat]
+    writeUser('custom_categories', updated)
     return newCat
   },
 
-  // --- Recurring Subscriptions / Upcoming ---
+  // --- Recurring Bills ---
   getRecurringBills() {
-    return read(KEYS.recurringBills, [
-      { id: 'rec-1', name: 'Netflix Premium', amount: 19.99, icon: '🎬', cycle: 'monthly', nextDate: '28 Aug 24' },
-      { id: 'rec-2', name: 'Spotify Duo', amount: 14.99, icon: '🎵', cycle: 'monthly', nextDate: '30 Aug 24' },
-      { id: 'rec-3', name: 'Gym Membership', amount: 45.00, icon: '🏋️', cycle: 'monthly', nextDate: '01 Sep 24' },
-    ])
+    return readUser('recurring_bills', [])
+  },
+  addRecurringBill(bill) {
+    const bills = this.getRecurringBills()
+    const newBill = {
+      id: 'rec-' + Date.now(),
+      name: bill.name,
+      amount: Number(bill.amount) || 0,
+      icon: bill.icon || '🧾',
+      nextDate: bill.nextDate || 'Upcoming',
+    }
+    const updated = [...bills, newBill]
+    writeUser('recurring_bills', updated)
+    return newBill
   },
 }

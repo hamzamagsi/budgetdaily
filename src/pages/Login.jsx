@@ -10,7 +10,6 @@ import {
 import { redirectToPolarCheckout } from '../lib/polar'
 import {
   Mail,
-  Phone,
   ShieldCheck,
   ArrowRight,
   RefreshCw,
@@ -18,19 +17,7 @@ import {
   AlertCircle,
   Lock,
   Inbox,
-  Sparkles,
 } from 'lucide-react'
-
-const COUNTRY_CODES = [
-  { code: '+1', country: 'US / CA', flag: '🇺🇸' },
-  { code: '+92', country: 'PK', flag: '🇵🇰' },
-  { code: '+44', country: 'UK', flag: '🇬🇧' },
-  { code: '+971', country: 'UAE', flag: '🇦🇪' },
-  { code: '+91', country: 'IN', flag: '🇮🇳' },
-  { code: '+966', country: 'SA', flag: '🇸🇦' },
-  { code: '+61', country: 'AU', flag: '🇦🇺' },
-  { code: '+49', country: 'DE', flag: '🇩🇪' },
-]
 
 export default function Login() {
   const navigate = useNavigate()
@@ -40,22 +27,16 @@ export default function Login() {
   const redirectTarget = searchParams.get('redirect')
   const planTarget = searchParams.get('plan')
 
-  const [authMethod, setAuthMethod] = useState('email')
-  const [step, setStep] = useState('input')
+  const [step, setStep] = useState('input') // 'input' | 'otp'
 
   // Input states
   const [email, setEmail] = useState('')
-  const [countryCode, setCountryCode] = useState('+1')
-  const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
 
   // OTP states
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
-  const [sentCode, setSentCode] = useState('')
-  const [resendTimer, setResendTimer] = useState(30)
-  const [isSupabaseRealEmail, setIsSupabaseRealEmail] = useState(false)
+  const [resendTimer, setResendTimer] = useState(60)
   const otpInputsRef = useRef([])
 
   const handlePostAuthRedirect = (userData) => {
@@ -88,16 +69,10 @@ export default function Login() {
     checkExistingSession()
   }, [])
 
-  // Validate Email
+  // Validate Email Regex
   const isValidEmail = (val) => {
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
     return emailRegex.test(val.trim())
-  }
-
-  // Validate Phone
-  const isValidPhone = (val) => {
-    const clean = val.replace(/\D/g, '')
-    return clean.length >= 7 && clean.length <= 15
   }
 
   // Countdown timer for OTP resend
@@ -109,86 +84,51 @@ export default function Login() {
     return () => clearInterval(interval)
   }, [step, resendTimer])
 
-  // Handle Send Verification Code
+  // STRICT SUPABASE OTP SEND HANDLER (NO FAKE CODES)
   const handleSendCode = async (e) => {
     e?.preventDefault()
     setError('')
-    setNotice('')
 
-    if (authMethod === 'email') {
-      const cleanEmail = email.trim()
-      if (!cleanEmail) {
-        setError('Please enter your email address')
+    const cleanEmail = email.trim().toLowerCase()
+    if (!cleanEmail) {
+      setError('Please enter your email address')
+      return
+    }
+    if (!isValidEmail(cleanEmail)) {
+      setError('Please enter a valid email address (e.g. name@gmail.com)')
+      return
+    }
+
+    setLoading(true)
+
+    if (!isSupabaseConfigured || !supabase) {
+      setLoading(false)
+      setError('Authentication server is connecting. Please try again.')
+      return
+    }
+
+    try {
+      const { error: sbErr } = await supabase.auth.signInWithOtp({
+        email: cleanEmail,
+        options: {
+          shouldCreateUser: true,
+        },
+      })
+
+      if (sbErr) {
+        setLoading(false)
+        setError(sbErr.message || 'Could not send verification code. Please check your email address.')
         return
       }
-      if (!isValidEmail(cleanEmail)) {
-        setError('Please enter a valid email address (e.g. name@gmail.com)')
-        return
-      }
 
-      setLoading(true)
-
-      // Try Real Supabase Email OTP first
-      if (isSupabaseConfigured && supabase) {
-        try {
-          const { error: sbErr } = await supabase.auth.signInWithOtp({
-            email: cleanEmail,
-            options: {
-              shouldCreateUser: true,
-            },
-          })
-
-          if (!sbErr) {
-            setIsSupabaseRealEmail(true)
-            setSentCode('')
-            setOtp(['', '', '', '', '', ''])
-            setResendTimer(30)
-            setLoading(false)
-            setStep('otp')
-            return
-          }
-
-          console.warn('Supabase mailer note:', sbErr.message)
-          const fallbackCode = Math.floor(100000 + Math.random() * 900000).toString()
-          setSentCode(fallbackCode)
-          setIsSupabaseRealEmail(false)
-          setNotice('A direct security verification code has been issued for your session.')
-          setOtp(['', '', '', '', '', ''])
-          setResendTimer(30)
-          setLoading(false)
-          setStep('otp')
-          return
-        } catch (err) {
-          console.warn('Supabase request error:', err)
-        }
-      }
-
-      // Standalone code generation
-      const generated = Math.floor(100000 + Math.random() * 900000).toString()
-      setSentCode(generated)
-      setIsSupabaseRealEmail(false)
+      // Success: Supabase sent real email
       setOtp(['', '', '', '', '', ''])
-      setResendTimer(30)
+      setResendTimer(60)
       setLoading(false)
       setStep('otp')
-    } else {
-      if (!phone.trim()) {
-        setError('Please enter your mobile phone number')
-        return
-      }
-      if (!isValidPhone(phone)) {
-        setError('Please enter a valid phone number (at least 7 digits)')
-        return
-      }
-
-      setLoading(true)
-      const generated = Math.floor(100000 + Math.random() * 900000).toString()
-      setSentCode(generated)
-      setIsSupabaseRealEmail(false)
-      setOtp(['', '', '', '', '', ''])
-      setResendTimer(30)
+    } catch (err) {
       setLoading(false)
-      setStep('otp')
+      setError(err?.message || 'Failed to send verification code. Please try again.')
     }
   }
 
@@ -212,65 +152,52 @@ export default function Login() {
     }
   }
 
-  // Verify OTP and Complete Login
+  // STRICT SUPABASE OTP VERIFICATION HANDLER
   const handleVerifyOtp = async (e) => {
     e?.preventDefault()
+    setError('')
     const entered = otp.join('')
     if (entered.length < 6) {
-      setError('Please enter the complete 6-digit code')
+      setError('Please enter the complete 6-digit code sent to your email')
       return
     }
 
     setLoading(true)
 
-    // Real Supabase Email OTP verification
-    if (isSupabaseRealEmail && isSupabaseConfigured && supabase && authMethod === 'email') {
-      try {
-        const { data, error: sbErr } = await supabase.auth.verifyOtp({
-          email: email.trim(),
-          token: entered,
-          type: 'email',
-        })
-
-        if (!sbErr && data?.user) {
-          const sbUser = data.user
-          const userData = {
-            id: sbUser.id,
-            email: sbUser.email,
-            name: sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0],
-            verified: true,
-            method: 'supabase_email',
-          }
-
-          const userObj = signIn(userData)
-          handlePostAuthRedirect(userObj)
-          return
-        }
-      } catch (err) {
-        console.warn('Supabase verify exception:', err)
-      }
-    }
-
-    // Direct / Fallback code validation
-    if (sentCode && entered !== sentCode && entered !== '123456') {
+    if (!isSupabaseConfigured || !supabase) {
       setLoading(false)
-      setError('Incorrect verification code. Please enter the valid 6-digit code.')
+      setError('Authentication service error. Please try again.')
       return
     }
 
-    // Successfully verified!
-    const userData =
-      authMethod === 'email'
-        ? { email: email.trim(), verified: true, method: 'email' }
-        : {
-            phone: `${countryCode} ${phone.trim()}`,
-            email: `user_${phone.slice(-4)}@budgetdaily.app`,
-            verified: true,
-            method: 'phone',
-          }
+    try {
+      const { data, error: sbErr } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token: entered,
+        type: 'email',
+      })
 
-    const userObj = signIn(userData)
-    handlePostAuthRedirect(userObj)
+      if (sbErr || !data?.user) {
+        setLoading(false)
+        setError(sbErr?.message || 'Invalid or expired verification code. Please check your inbox.')
+        return
+      }
+
+      const sbUser = data.user
+      const userData = {
+        id: sbUser.id,
+        email: sbUser.email,
+        name: sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0],
+        verified: true,
+        method: 'supabase_email',
+      }
+
+      const userObj = signIn(userData)
+      handlePostAuthRedirect(userObj)
+    } catch (err) {
+      setLoading(false)
+      setError(err?.message || 'Verification failed. Please try again.')
+    }
   }
 
   // Handle Google Sign-In in ALL browsers
@@ -301,29 +228,16 @@ export default function Login() {
           const userObj = signIn(verifiedUser)
           handlePostAuthRedirect(userObj)
         },
-        onError: () => demoGoogleSignIn(),
+        onError: (err) => {
+          setLoading(false)
+          setError('Google sign-in could not be completed. Please use Email verification.')
+        },
       })
       return
     }
 
-    demoGoogleSignIn()
-  }
-
-  const demoGoogleSignIn = () => {
-    setTimeout(() => {
-      const emailToUse = email.trim() && isValidEmail(email) ? email.trim() : 'hamza.magsi@gmail.com'
-      const nameToUse = emailToUse.split('@')[0].replace('.', ' ')
-      const userObj = signIn({
-        id: 'google_' + Date.now(),
-        email: emailToUse,
-        name: nameToUse.charAt(0).toUpperCase() + nameToUse.slice(1),
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-        email_verified: true,
-        verified: true,
-        method: 'google',
-      })
-      handlePostAuthRedirect(userObj)
-    }, 400)
+    setLoading(false)
+    setError('Google sign-in service unavailable. Please sign in with your email.')
   }
 
   return (
@@ -339,141 +253,70 @@ export default function Login() {
           </h1>
           <p className="text-xs sm:text-sm text-[#64748b] mt-1.5">
             {step === 'otp'
-              ? `Check your verification code for ${authMethod === 'email' ? email : `${countryCode} ${phone}`}`
-              : 'Real Supabase & Google Identity Verification'}
+              ? `Enter the 6-digit code sent to ${email}`
+              : 'Secure verification via Supabase & Google'}
           </p>
         </div>
 
         {/* STEP 1: Main Login Screen */}
         {step === 'input' && (
-          <div>
+          <div className="space-y-4">
             {/* GOOGLE SIGN IN BUTTON */}
-            <div className="space-y-2 mb-5">
-              <button
-                type="button"
-                onClick={handleGoogleClick}
-                disabled={loading}
-                className="w-full py-3.5 px-4 rounded-2xl bg-[#f8f6ff] hover:bg-[#ede9fe] border border-[#e8e4f5] text-[#1f2430] text-xs sm:text-sm font-semibold flex items-center justify-center gap-3 transition-all cursor-pointer shadow-xs active:scale-[0.99]"
-              >
-                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                  <path
-                    fill="#EA4335"
-                    d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.4l3.7 2.9C6.5 7.4 9 5 12 5z"
-                  />
-                  <path
-                    fill="#4285F4"
-                    d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.6 14.7c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3L1.9 7.2C.7 9.6 0 12.2 0 15s.7 5.4 1.9 7.8l3.7-3.1z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.3L1.9 16c1.8 3.8 5.6 7 10.1 7z"
-                  />
-                </svg>
-                <span>Continue with Google</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleGoogleClick}
+              disabled={loading}
+              className="w-full py-3.5 px-4 rounded-2xl bg-[#f8f6ff] hover:bg-[#ede9fe] border border-[#e8e4f5] text-[#1f2430] text-xs sm:text-sm font-semibold flex items-center justify-center gap-3 transition-all cursor-pointer shadow-xs active:scale-[0.99]"
+            >
+              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                <path
+                  fill="#EA4335"
+                  d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.4l3.7 2.9C6.5 7.4 9 5 12 5z"
+                />
+                <path
+                  fill="#4285F4"
+                  d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.6 14.7c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3L1.9 7.2C.7 9.6 0 12.2 0 15s.7 5.4 1.9 7.8l3.7-3.1z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.3L1.9 16c1.8 3.8 5.6 7 10.1 7z"
+                />
+              </svg>
+              <span>Continue with Google</span>
+            </button>
 
-            <div className="flex items-center gap-3 my-5">
+            <div className="flex items-center gap-3 my-4">
               <div className="flex-1 h-[1px] bg-[#f1edf9]" />
               <span className="text-[11px] uppercase tracking-wider text-[#94a3b8] font-mono">
-                or sign in with email / phone
+                or with email code
               </span>
               <div className="flex-1 h-[1px] bg-[#f1edf9]" />
             </div>
 
-            {/* Auth Method Selector */}
-            <div className="flex rounded-2xl bg-[#f8f6ff] p-1 border border-[#e8e4f5] mb-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMethod('email')
-                  setError('')
-                }}
-                className={`flex-1 py-2 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  authMethod === 'email'
-                    ? 'bg-white text-[#6c5ce7] shadow-xs'
-                    : 'text-[#64748b] hover:text-[#1f2430]'
-                }`}
-              >
-                <Mail size={14} />
-                <span>Email Address</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMethod('phone')
-                  setError('')
-                }}
-                className={`flex-1 py-2 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  authMethod === 'phone'
-                    ? 'bg-white text-[#6c5ce7] shadow-xs'
-                    : 'text-[#64748b] hover:text-[#1f2430]'
-                }`}
-              >
-                <Phone size={14} />
-                <span>Mobile Number</span>
-              </button>
-            </div>
-
             <form onSubmit={handleSendCode} className="space-y-4">
-              {authMethod === 'email' ? (
-                <div>
-                  <label className="block text-xs font-medium text-[#64748b] mb-1.5">
-                    Email Address
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      required
-                      placeholder="name@gmail.com"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value)
-                        setError('')
-                      }}
-                      className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#f8f6ff] border border-[#e8e4f5] text-sm text-[#1f2430] outline-none focus:border-[#6c5ce7] transition-all font-mono"
-                    />
-                    <Mail size={18} className="absolute left-3.5 top-3.5 text-[#94a3b8]" />
-                  </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#64748b] mb-1.5">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    required
+                    placeholder="name@gmail.com"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value)
+                      setError('')
+                    }}
+                    className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#f8f6ff] border border-[#e8e4f5] text-sm text-[#1f2430] outline-none focus:border-[#6c5ce7] transition-all font-mono"
+                  />
+                  <Mail size={18} className="absolute left-3.5 top-3.5 text-[#94a3b8]" />
                 </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-medium text-[#64748b] mb-1.5">
-                    Mobile Phone Number
-                  </label>
-                  <div className="flex gap-2">
-                    <select
-                      value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
-                      className="px-2.5 py-3 rounded-2xl bg-[#f8f6ff] border border-[#e8e4f5] text-xs text-[#1f2430] outline-none focus:border-[#6c5ce7] transition-all cursor-pointer"
-                    >
-                      {COUNTRY_CODES.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.flag} {c.code}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="relative flex-1">
-                      <input
-                        type="tel"
-                        required
-                        placeholder="300 1234567"
-                        value={phone}
-                        onChange={(e) => {
-                          setPhone(e.target.value)
-                          setError('')
-                        }}
-                        className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[#f8f6ff] border border-[#e8e4f5] text-sm text-[#1f2430] outline-none focus:border-[#6c5ce7] transition-all font-mono"
-                      />
-                      <Phone size={16} className="absolute left-3.5 top-3.5 text-[#94a3b8]" />
-                    </div>
-                  </div>
-                </div>
-              )}
+              </div>
 
               {error && (
                 <div className="flex items-center gap-2 p-3 rounded-2xl bg-red-50 border border-red-200 text-red-600 text-xs">
@@ -500,7 +343,7 @@ export default function Login() {
           </div>
         )}
 
-        {/* STEP 2: 6-Digit OTP Code Verification */}
+        {/* STEP 2: 6-Digit Real Supabase OTP Code Verification */}
         {step === 'otp' && (
           <div>
             <div className="p-4 rounded-2xl bg-[#f8f6ff] border border-[#e8e4f5] mb-6 text-center space-y-2">
@@ -508,19 +351,11 @@ export default function Login() {
                 <Inbox size={20} />
               </div>
               <p className="text-xs font-bold text-[#1f2430]">
-                {isSupabaseRealEmail ? 'Verification Code Sent to Email' : 'Security Verification Code'}
+                Check Your Email Inbox
               </p>
               <p className="text-[11px] text-[#64748b] leading-relaxed">
-                {isSupabaseRealEmail
-                  ? `Please check your email inbox at ${email}.`
-                  : `Enter the verification code for ${email || phone}.`}
+                We sent a 6-digit security code to <strong className="text-[#1f2430]">{email}</strong>. Enter it below to sign in.
               </p>
-
-              {sentCode && (
-                <div className="pt-2 border-t border-[#f1edf9] text-xs text-[#6c5ce7] font-mono">
-                  Verification Code: <strong className="text-[#1f2430] tracking-widest text-sm">{sentCode}</strong>
-                </div>
-              )}
             </div>
 
             <form onSubmit={handleVerifyOtp} className="space-y-5">
@@ -571,7 +406,7 @@ export default function Login() {
                   }}
                   className="text-[#64748b] hover:text-[#1f2430] transition-colors cursor-pointer"
                 >
-                  Change {authMethod === 'email' ? 'Email' : 'Phone'}
+                  Change Email
                 </button>
 
                 <button

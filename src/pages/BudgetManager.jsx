@@ -23,9 +23,10 @@ export default function BudgetManager() {
   const [categoryBudgets, setCategoryBudgets] = useState(store.getCategoryBudgets())
   const [categories, setCategories] = useState(store.getCategories())
   const [activeAccount, setActiveAccount] = useState(store.getActiveAccount())
+  const curr = store.getCurrency() || '$'
 
   const [mode, setMode] = useState(budget?.mode || 'budget')
-  const [totalAmount, setTotalAmount] = useState(budget?.totalAmount || 4500)
+  const [totalAmount, setTotalAmount] = useState(budget?.totalAmount || 1000)
   const [categoryBudgetEnabled, setCategoryBudgetEnabled] = useState(
     budget?.categoryBudgetEnabled ?? true
   )
@@ -54,7 +55,7 @@ export default function BudgetManager() {
 
   const handleSaveBudget = () => {
     store.updateBudget({
-      totalAmount: Number(totalAmount) || 4500,
+      totalAmount: Number(totalAmount) || 0,
       mode,
       categoryBudgetEnabled,
     })
@@ -83,15 +84,14 @@ export default function BudgetManager() {
 
           <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white border border-[#e8e4f5] text-xs font-bold text-[#1f2430] shadow-xs">
             <Calendar size={14} className="text-[#6c5ce7]" />
-            <span>01 Aug 24 - 31 Aug 24</span>
-            <ChevronDown size={14} className="text-[#94a3b8]" />
+            <span>{budget?.periodLabel || 'Current Budget Period'}</span>
           </div>
 
           <button
             type="button"
             onClick={() => {
               if (window.confirm('Reset this budget period?')) {
-                setTotalAmount(4500)
+                setTotalAmount(0)
                 handleSaveBudget()
               }
             }}
@@ -113,7 +113,7 @@ export default function BudgetManager() {
                 <span className="text-xs font-bold text-[#1f2430]">{activeAccount.name}</span>
               </div>
               <span className="text-xs font-mono font-bold text-[#64748b]">
-                ${activeAccount.balance.toFixed(2)}
+                {curr}{activeAccount.balance.toFixed(2)}
               </span>
             </div>
 
@@ -150,7 +150,7 @@ export default function BudgetManager() {
               </label>
               <div className="flex items-center justify-between px-5 py-4 rounded-3xl bg-[#e6f4f1] border border-[#c7ede4] text-[#0f766e]">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold font-mono">$</span>
+                  <span className="text-2xl font-bold font-mono">{curr}</span>
                   <input
                     type="number"
                     value={totalAmount}
@@ -217,7 +217,7 @@ export default function BudgetManager() {
                         </div>
 
                         <div className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#e6f4f1] border border-[#c7ede4] text-[#0f766e] text-xs font-mono font-bold">
-                          <span>$</span>
+                          <span>{curr}</span>
                           <input
                             type="number"
                             value={amount}
@@ -237,7 +237,7 @@ export default function BudgetManager() {
               <div>
                 <p className="text-xs text-white/80 font-medium">Total Allocated</p>
                 <p className="text-base sm:text-lg font-bold font-mono">
-                  ${totalAllocated.toLocaleString('en-US', { minimumFractionDigits: 2 })} out of $
+                  {curr}{totalAllocated.toLocaleString('en-US', { minimumFractionDigits: 2 })} out of {curr}
                   {Number(totalAmount).toLocaleString('en-US')}
                 </p>
               </div>
