@@ -8,6 +8,9 @@ import BudgetManager from './pages/BudgetManager'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
 import Subscribe from './pages/Subscribe'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
+import CookieBanner from './components/CookieBanner'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -24,6 +27,8 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/subscribe" element={<Subscribe />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
           <Route
             path="/onboarding"
             element={
@@ -66,6 +71,7 @@ export default function App() {
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <CookieBanner />
       </BrowserRouter>
     </AuthProvider>
   )

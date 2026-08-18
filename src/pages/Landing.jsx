@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import {
   Sparkles,
   ArrowRight,
@@ -16,15 +16,19 @@ import {
   Calculator,
   Shield,
   Zap,
+  MessageSquare,
+  FileText,
 } from 'lucide-react'
 import { PRICING_PLANS, FREE_FEATURES, PREMIUM_FEATURES } from '../components/PremiumModal'
 import { useAuth } from '../context/AuthContext'
 import { store } from '../lib/store'
 import { redirectToPolarCheckout } from '../lib/polar'
+import FeedbackModal from '../components/FeedbackModal'
 
 export default function Landing() {
   const navigate = useNavigate()
   const { user, loading } = useAuth()
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
 
   useEffect(() => {
     if (!loading && user) {
@@ -295,22 +299,40 @@ export default function Landing() {
       </main>
 
       {/* FOOTER */}
-      <footer className="py-8 bg-white border-t border-[#e8e4f5] text-center text-xs text-[#94a3b8]">
-        <div className="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <footer className="py-8 bg-white border-t border-[#e8e4f5] text-center text-xs text-[#64748b]">
+        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <span className="font-bold text-[#1f2430]">BudgetDaily</span>
             <span>·</span>
-            <span>Real Financial Clarity</span>
+            <span>Spend what's actually safe today</span>
           </div>
-          <div className="flex items-center gap-4 text-[11px]">
-            <span>Powered by Polar.sh</span>
+
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
+            <Link to="/privacy" className="hover:text-[#6c5ce7] transition-colors">
+              Privacy Policy
+            </Link>
             <span>•</span>
-            <span>Supabase 256-bit Encrypted</span>
+            <Link to="/terms" className="hover:text-[#6c5ce7] transition-colors">
+              Terms of Service
+            </Link>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={() => setIsFeedbackOpen(true)}
+              className="hover:text-[#6c5ce7] transition-colors cursor-pointer"
+            >
+              Support & Bugs
+            </button>
             <span>•</span>
             <span>© {new Date().getFullYear()}</span>
           </div>
         </div>
       </footer>
+
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+      />
     </div>
   )
 }

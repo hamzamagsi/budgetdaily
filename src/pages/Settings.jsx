@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { store } from '../lib/store'
 import Navbar from '../components/Navbar'
@@ -7,6 +7,7 @@ import BottomNav from '../components/BottomNav'
 import AddTransactionModal from '../components/AddTransactionModal'
 import CustomCategoryModal from '../components/CustomCategoryModal'
 import PremiumModal from '../components/PremiumModal'
+import FeedbackModal from '../components/FeedbackModal'
 import {
   User,
   Wallet,
@@ -20,6 +21,9 @@ import {
   Receipt,
   Layers,
   Plus,
+  ExternalLink,
+  MessageSquare,
+  FileText,
 } from 'lucide-react'
 
 export default function Settings() {
@@ -32,6 +36,7 @@ export default function Settings() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isCustomCatOpen, setIsCustomCatOpen] = useState(false)
   const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false)
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
 
   const refreshData = () => {
     setAccounts(store.getAccounts())
@@ -131,7 +136,7 @@ export default function Settings() {
               <p className="text-xs text-white/80 leading-relaxed">
                 {isPro
                   ? 'All 10 premium superpowers unlocked including unlimited logs, custom icons, and AI analytics.'
-                  : 'Upgrade to Pro for $1/mo via Polar.sh to unlock unlimited daily transactions, custom icons, and PDF exports.'}
+                  : 'Upgrade to Pro starting at $1.99/mo via Polar.sh to unlock unlimited daily transactions, custom icons, and CSV exports.'}
               </p>
 
               {!isPro ? (
@@ -141,12 +146,23 @@ export default function Settings() {
                   className="w-full py-3.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Sparkles size={16} />
-                  <span>Get Pro ($1 / month)</span>
+                  <span>Get Pro (Starting at $1.99)</span>
                 </button>
               ) : (
-                <div className="flex items-center gap-2 text-xs text-emerald-200">
-                  <CheckCircle2 size={16} />
-                  <span>Polar.sh subscription active & verified</span>
+                <div className="space-y-2 pt-2 border-t border-white/20">
+                  <div className="flex items-center gap-2 text-xs text-emerald-200">
+                    <CheckCircle2 size={16} />
+                    <span>Polar.sh subscription active & verified</span>
+                  </div>
+                  <a
+                    href="https://polar.sh/purchases"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-white/90 underline hover:text-white font-medium"
+                  >
+                    <span>Manage / Cancel Subscription on Polar</span>
+                    <ExternalLink size={12} />
+                  </a>
                 </div>
               )}
             </div>
@@ -170,6 +186,40 @@ export default function Settings() {
                   </span>
                 )}
               </button>
+            </div>
+
+            {/* HELP, FEEDBACK & LEGAL */}
+            <div className="figma-card p-6 space-y-2.5">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[#94a3b8]">Support & Legal</h4>
+
+              <button
+                type="button"
+                onClick={() => setIsFeedbackOpen(true)}
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-[#f8f6ff] hover:bg-[#ede9fe] text-xs font-medium text-[#1f2430] transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <MessageSquare size={16} className="text-[#6c5ce7]" />
+                  <span>Contact Support & Report Bug</span>
+                </div>
+                <ChevronRight size={14} className="text-[#94a3b8]" />
+              </button>
+
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#f1edf9]">
+                <Link
+                  to="/privacy"
+                  className="flex items-center gap-1.5 p-2 rounded-xl text-xs text-[#64748b] hover:text-[#1f2430] hover:bg-[#f8f6ff]"
+                >
+                  <Shield size={14} className="text-[#6c5ce7]" />
+                  <span>Privacy Policy</span>
+                </Link>
+                <Link
+                  to="/terms"
+                  className="flex items-center gap-1.5 p-2 rounded-xl text-xs text-[#64748b] hover:text-[#1f2430] hover:bg-[#f8f6ff]"
+                >
+                  <FileText size={14} className="text-[#6c5ce7]" />
+                  <span>Terms of Service</span>
+                </Link>
+              </div>
             </div>
 
             {/* SIGN OUT BUTTON */}
@@ -277,6 +327,11 @@ export default function Settings() {
       <PremiumModal
         isOpen={isPremiumModalOpen}
         onClose={() => setIsPremiumModalOpen(false)}
+      />
+
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
       />
     </div>
   )
